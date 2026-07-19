@@ -394,7 +394,7 @@ td{
         <div class="stat-box" style="border-left-color:var(--brick);"><div class="num font-mono" id="statSaldo">Rp 0</div><div class="lbl">Saldo Kas</div></div>
       </div>
 
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
         <div class="card" style="padding:18px;">
           <h3 style="margin:0 0 12px; font-size:15px;">Tugas Terbaru</h3>
           <div id="dashTugasList" style="font-size:13px;"></div>
@@ -403,6 +403,12 @@ td{
           <h3 style="margin:0 0 12px; font-size:15px;">Agenda Terdekat</h3>
           <div id="dashJadwalList" style="font-size:13px;"></div>
         </div>
+      </div>
+
+      <div class="card" style="padding:18px;">
+        <h3 style="margin:0 0 4px; font-size:15px;">Papan Poin Kontribusi</h3>
+        <p style="font-size:11.5px; color:var(--ink-soft); margin:0 0 12px;">1 poin per tugas yang ditandai selesai oleh anggota tsb.</p>
+        <div id="dashLeaderboard" style="font-size:13px;"></div>
       </div>
     </section>
 
@@ -437,6 +443,8 @@ td{
           <select id="filterDivisiTugas" onchange="renderTugas()" style="width:auto;">
             <option value="semua">Semua Divisi</option>
             <option value="bph">BPH</option>
+            <option value="sekretaris">Sekretaris</option>
+            <option value="bendahara">Bendahara</option>
             <option value="akademi">Akademi</option>
             <option value="humas">Humas</option>
             <option value="pdd">PDD</option>
@@ -532,7 +540,7 @@ const secondaryAuth = secondaryApp.auth();
    hapus form setup) supaya orang lain tidak bisa membuat akun Super baru. */
 const SUPER_SETUP_CODE = "KKN-SUPER-2026";
 
-const ROLE_LABELS = { super:'Super Admin', bph:'BPH', akademi:'Sie Akademi', humas:'Sie Humas', pdd:'Sie PDD', acara:'Sie Acara' };
+const ROLE_LABELS = { super:'Super Admin', bph:'BPH', sekretaris:'Sekretaris', bendahara:'Bendahara', akademi:'Sie Akademi', humas:'Sie Humas', pdd:'Sie PDD', acara:'Sie Acara' };
 
 let currentUser = null;   // firebase auth user
 let currentProfile = null; // firestore users/{uid} doc
@@ -715,6 +723,24 @@ function renderDashboard(){
       <span class="font-mono" style="color:var(--ink-soft); font-size:11px;">${fmtDate(j.tanggal)}</span> — ${escapeHtml(j.kegiatan)}
     </div>`).join('') || '<p style="color:var(--ink-soft);">Belum ada agenda.</p>';
   document.getElementById('dashJadwalList').innerHTML = dashJadwal;
+
+  renderLeaderboard();
+}
+
+function renderLeaderboard(){
+  const poin = {}; // nama -> jumlah tugas selesai
+  cache.tasks.forEach(t => {
+    if(t.status === 'selesai' && t.completedBy){
+      poin[t.completedBy] = (poin[t.completedBy]||0) + 1;
+    }
+  });
+  const ranked = Object.entries(poin).sort((a,b) => b[1]-a[1]);
+  const medal = ['🥇','🥈','🥉'];
+  document.getElementById('dashLeaderboard').innerHTML = ranked.length ? ranked.map(([nama,jumlah],i) => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);">
+      <span>${medal[i]||('#'+(i+1))} ${escapeHtml(nama)}</span>
+      <span class="font-mono" style="font-weight:600;">${jumlah} poin</span>
+    </div>`).join('') : '<p style="color:var(--ink-soft);">Belum ada tugas yang diselesaikan.</p>';
 }
 
 function escapeHtml(s){
@@ -852,6 +878,10 @@ function renderTugas(){
       <div class="font-mono" style="font-size:11px; color:var(--ink-soft); margin-bottom:10px;">
         ${ROLE_LABELS[t.divisi]||t.divisi} · PJ: ${escapeHtml(t.penanggungJawab||'-')} · Deadline: ${t.deadline ? fmtDate(t.deadline) : '-'}
       </div>
+      ${t.status==='selesai' && t.completedBy ? `
+      <div class="font-mono" style="font-size:11px; color:var(--forest); margin-bottom:10px;">
+        ✓ Dikerjakan oleh: ${escapeHtml(t.completedBy)}
+      </div>` : ''}
       ${canManage(t.divisi) ? `
       <div style="display:flex; gap:6px; flex-wrap:wrap;">
         <select onchange="updateTugasStatus('${t.id}', this.value)" style="width:auto; font-size:11.5px; padding:5px 8px;">
@@ -901,7 +931,19 @@ function saveTugas(id){
   }
 }
 function updateTugasStatus(id, status){
-  db.collection('tasks').doc(id).update({ status }).then(()=> toast('Status tugas diperbarui.'));
+  const data = { status };
+  if(status === 'selesai'){
+    // Siapa pun yang menekan "Selesai" itulah yang dianggap mengerjakan —
+    // supaya poin kontribusi tercatat otomatis tanpa isi form terpisah.
+    data.completedBy = currentProfile.nama;
+    data.completedByUid = currentUser.uid;
+    data.completedAt = firebase.firestore.FieldValue.serverTimestamp();
+  } else {
+    data.completedBy = firebase.firestore.FieldValue.delete();
+    data.completedByUid = firebase.firestore.FieldValue.delete();
+    data.completedAt = firebase.firestore.FieldValue.delete();
+  }
+  db.collection('tasks').doc(id).update(data).then(()=> toast('Status tugas diperbarui.'));
 }
 function deleteTugas(id){
   if(!confirm('Hapus tugas ini?')) return;
