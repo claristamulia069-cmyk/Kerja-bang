@@ -1,0 +1,12 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Hanya pengguna yang sudah login (anggota kepanitiaan) yang bisa
+    // membaca dan mengunggah dokumen.
+    match /dokumen/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 20 * 1024 * 1024; // maks 20MB per file
+    }
+  }
+}
