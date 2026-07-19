@@ -1,1361 +1,963 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sistem Kepanitiaan</title>
-    <!-- Firebase SDK (compat) -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-    <style>
-        /* ===== RESET & DASAR ===== */
-        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; }
-        body { background: #f4f7fc; padding: 20px; min-height: 100vh; }
-        .container { max-width: 1200px; margin: 0 auto; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistem Manajemen KKN</title>
 
-        /* ===== LOGIN ===== */
-        #login-page { max-width: 400px; margin: 60px auto; background: white; padding: 40px; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
-        #login-page h2 { text-align: center; margin-bottom: 20px; }
-        .auth-toggle { text-align: center; margin-top: 15px; color: #2563eb; cursor: pointer; }
-        .reset-link { color: #2563eb; cursor: pointer; margin-top: 10px; display: inline-block; font-size: 14px; }
-        #loginMessage, #registerMessage { margin-top: 10px; color: #b91c1c; font-size: 14px; }
-        #resetMessage { margin-top: 10px; color: #2563eb; font-size: 14px; }
+<!-- ================= FONTS ================= -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bitter:ital,wght@0,500;0,600;0,700;1,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-        /* ===== LOGOUT ===== */
-        .logout-btn { position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; border: none; padding: 10px 20px; border-radius: 30px; cursor: pointer; font-weight: 600; z-index: 999; }
+<!-- ================= FIREBASE (compat SDK) ================= -->
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-storage-compat.js"></script>
 
-        /* ===== PAGE ===== */
-        .page { display: none; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); margin-top: 20px; }
-        .page.active { display: block; }
-        .back-btn { background: #e2e8f0; border: none; padding: 8px 20px; border-radius: 30px; cursor: pointer; margin-bottom: 20px; font-weight: 600; }
+<style>
+/* ============================================================
+   DESIGN TOKENS
+   Tema: "Buku Lapangan KKN" - logbook lapangan, stempel dinas,
+   kop surat desa. Bukan dashboard SaaS generik.
+   ============================================================ */
+:root{
+  --paper:      #EFEADC;   /* kanvas / kertas lapangan */
+  --paper-dark: #E4DEC9;
+  --ink:        #23241F;   /* hampir hitam, coklat gelap */
+  --ink-soft:   #55524A;
+  --forest:     #2F4A3C;   /* hijau hutan - selesai / primary */
+  --forest-dim: #24382D;
+  --ochre:      #C98A2B;   /* kuning tanah - proses / aksen */
+  --brick:      #A64B3D;   /* merah bata - belum / peringatan */
+  --line:       #C9C0A4;   /* garis kop surat */
+  --card:       #F8F5EA;
+  --sidebar:    #1D1E19;
+  --sidebar-line:#33352C;
+}
 
-        /* ===== GRID MENU ===== */
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; margin: 30px 0; }
-        .card { background: white; padding: 30px 15px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); text-align: center; cursor: pointer; transition: 0.2s; border: 2px solid transparent; }
-        .card:hover { border-color: #2563eb; transform: translateY(-4px); }
-        .card h3 { font-size: 18px; color: #1e293b; }
-        .card .badge { font-size: 12px; background: #e2e8f0; padding: 4px 12px; border-radius: 20px; margin-top: 6px; display: inline-block; }
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'IBM Plex Sans', sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.font-display{ font-family:'Bitter', serif; }
+.font-mono{ font-family:'IBM Plex Mono', monospace; }
 
-        /* ===== FORM ===== */
-        .form-group { margin-bottom: 18px; }
-        .form-group label { display: block; font-weight: 600; margin-bottom: 6px; color: #334155; font-size: 14px; }
-        .form-group input, .form-group textarea { width: 100%; padding: 12px 14px; border: 1px solid #cbd5e1; border-radius: 10px; font-size: 14px; background: #f8fafc; }
-        .form-group input:focus, .form-group textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); background: white; }
-        .form-group input[type="file"] { padding: 10px; background: white; }
+::selection{ background:var(--ochre); color:var(--paper); }
 
-        /* ===== TOMBOL ===== */
-        .btn-primary { background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 30px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .btn-primary:hover { background: #1d4ed8; transform: scale(1.02); }
-        .btn-success { background: #22c55e; color: white; border: none; padding: 12px 24px; border-radius: 30px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .btn-success:hover { background: #16a34a; transform: scale(1.02); }
-        .btn-danger { background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 30px; cursor: pointer; font-weight: 600; }
-        .btn-danger:hover { background: #dc2626; }
-        .btn-export { background: #8b5cf6; color: white; border: none; padding: 10px 20px; border-radius: 30px; cursor: pointer; font-weight: 600; margin-bottom: 15px; }
-        .btn-export:hover { background: #7c3aed; }
-        .edit-btn { background: #f59e0b; color: white; border: none; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: 600; }
-        .edit-btn:hover { background: #d97706; }
+.hidden{ display:none !important; }
 
-        /* ===== ITEM CARD ===== */
-        .item-card { background: #f8fafc; padding: 16px; border-radius: 12px; margin-bottom: 12px; border-left: 6px solid #2563eb; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; }
-        .item-card img { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; }
-        .item-card .late { background: #fee2e2; color: #b91c1c; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
-        .item-card .ontime { background: #dcfce7; color: #15803d; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+/* ---------- letterhead / kop surat ---------- */
+.letterhead{
+  border-bottom:3px double var(--ink);
+  padding-bottom:14px;
+  margin-bottom:24px;
+}
+.letterhead .eyebrow{
+  font-family:'IBM Plex Mono', monospace;
+  font-size:11px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--ink-soft);
+}
+.letterhead h1{
+  font-size:28px;
+  margin:4px 0 0;
+  font-weight:700;
+}
 
-        /* ===== FLEX & STAT ===== */
-        .flex-row { display: flex; gap: 20px; flex-wrap: wrap; }
-        .stat-box { background: #f1f5f9; padding: 20px; border-radius: 12px; flex: 1; min-width: 150px; text-align: center; }
-        .stat-box h4 { color: #475569; font-size: 14px; }
-        .stat-box p { font-size: 28px; font-weight: 700; color: #0f172a; }
+/* ---------- sidebar (buku lapangan tab index) ---------- */
+.sidebar{
+  background:var(--sidebar);
+  color:#EFEADC;
+  width:240px;
+  min-height:100vh;
+  flex-shrink:0;
+}
+.sidebar-brand{
+  padding:22px 20px 18px;
+  border-bottom:1px solid var(--sidebar-line);
+}
+.sidebar-brand .mark{
+  font-family:'Bitter',serif;
+  font-weight:700;
+  font-size:19px;
+  letter-spacing:.01em;
+}
+.sidebar-brand .sub{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;
+  color:#9C9788;
+  letter-spacing:.08em;
+  margin-top:3px;
+}
+.nav-item{
+  display:flex; align-items:center; gap:10px;
+  padding:12px 20px;
+  font-size:13.5px;
+  color:#C9C4B2;
+  border-left:3px solid transparent;
+  cursor:pointer;
+  transition:background .12s ease;
+  font-family:'IBM Plex Mono',monospace;
+  letter-spacing:.02em;
+}
+.nav-item:hover{ background:#26271F; }
+.nav-item.active{
+  color:#fff;
+  border-left-color:var(--ochre);
+  background:#26271F;
+}
+.nav-item .num{ opacity:.45; font-size:11px; width:16px; }
+.sidebar-user{
+  margin-top:auto;
+  padding:16px 20px;
+  border-top:1px solid var(--sidebar-line);
+  font-size:12px;
+}
+.sidebar-user .name{ color:#fff; font-weight:600; }
+.sidebar-user .role-badge{
+  display:inline-block;
+  margin-top:6px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  padding:3px 8px;
+  border:1px solid #4A4C3F;
+  color:#C9C4B2;
+}
+.logout-btn{
+  margin-top:10px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  color:#C98A2B;
+  cursor:pointer;
+  text-decoration:underline;
+  text-underline-offset:3px;
+}
 
-        /* ===== TAB ===== */
-        .tab { display: inline-block; padding: 10px 20px; background: #e2e8f0; border-radius: 30px; margin-right: 10px; cursor: pointer; font-weight: 600; transition: 0.2s; }
-        .tab.active { background: #2563eb; color: white; }
-        .tab-content { display: none; margin-top: 20px; }
-        .tab-content.active { display: block; }
+/* ---------- stempel / stamp signature element ---------- */
+.stamp{
+  display:inline-block;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;
+  font-weight:600;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  padding:4px 10px;
+  border:2px dashed currentColor;
+  border-radius:3px;
+  transform:rotate(-3deg);
+  white-space:nowrap;
+}
+.stamp-selesai{ color:var(--forest); }
+.stamp-proses{  color:var(--ochre); }
+.stamp-belum{   color:var(--brick); }
 
-        /* ===== DEADLINE ===== */
-        .deadline-set { background: #fef9c3; padding: 10px 16px; border-radius: 10px; margin-bottom: 16px; border: 1px solid #facc15; }
+/* ---------- cards (kartu arsip) ---------- */
+.card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:4px;
+}
+.card-perforated{
+  position:relative;
+  border-left:3px solid var(--ink);
+}
 
-        /* ===== PROFIL ===== */
-        .profile-card { background: #f1f5f9; padding: 15px 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
-        .profile-card .info { display: flex; gap: 20px; flex-wrap: wrap; }
-        .profile-card .points { background: #2563eb; color: white; padding: 6px 18px; border-radius: 30px; font-weight: 700; }
+.btn{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:12.5px;
+  letter-spacing:.03em;
+  padding:9px 16px;
+  border-radius:3px;
+  border:1px solid var(--ink);
+  background:var(--ink);
+  color:var(--paper);
+  cursor:pointer;
+  transition:opacity .12s ease;
+}
+.btn:hover{ opacity:.82; }
+.btn-outline{
+  background:transparent;
+  color:var(--ink);
+}
+.btn-danger{
+  background:var(--brick);
+  border-color:var(--brick);
+  color:#fff;
+}
+.btn-sm{ padding:6px 11px; font-size:11.5px; }
 
-        /* ===== KETUA STAT ===== */
-        .ketua-stat { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 25px; }
-        .ketua-stat .stat { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); text-align: center; border: 1px solid #e2e8f0; }
-        .ketua-stat .stat .number { font-size: 32px; font-weight: 700; color: #0f172a; }
-        .ketua-stat .stat .label { font-size: 14px; color: #64748b; }
+input,select,textarea{
+  font-family:'IBM Plex Sans',sans-serif;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:3px;
+  padding:9px 11px;
+  font-size:13.5px;
+  color:var(--ink);
+  width:100%;
+}
+input:focus,select:focus,textarea:focus{
+  outline:2px solid var(--ochre);
+  outline-offset:1px;
+  border-color:var(--ochre);
+}
+label{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  color:var(--ink-soft);
+  display:block;
+  margin-bottom:5px;
+}
 
-        /* ===== LEADERBOARD ===== */
-        .leaderboard-item { display: flex; justify-content: space-between; padding: 10px 15px; background: white; border-radius: 10px; margin-bottom: 6px; border-left: 4px solid #2563eb; }
-        .leaderboard-item .rank { font-weight: 700; color: #64748b; width: 30px; }
-        .leaderboard-item .pts { font-weight: 700; color: #0f172a; }
+table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+th{
+  text-align:left;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10.5px;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--ink-soft);
+  border-bottom:2px solid var(--ink);
+  padding:8px 10px;
+}
+td{
+  padding:10px;
+  border-bottom:1px solid var(--line);
+  vertical-align:top;
+}
 
-        /* ===== LOG ENTRY ===== */
-        .log-entry { display: flex; justify-content: space-between; padding: 6px 12px; background: #f8fafc; border-radius: 6px; margin-bottom: 4px; font-size: 14px; border-left: 3px solid #22c55e; }
+.modal-overlay{
+  position:fixed; inset:0;
+  background:rgba(29,30,25,.55);
+  display:flex; align-items:center; justify-content:center;
+  z-index:50;
+  padding:20px;
+}
+.modal{
+  background:var(--paper);
+  border:1px solid var(--ink);
+  border-radius:4px;
+  width:100%; max-width:480px;
+  padding:24px;
+  max-height:88vh;
+  overflow-y:auto;
+}
 
-        /* ===== DPL GRID ===== */
-        .dpl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .dpl-grid > div { background: #f8fafc; padding: 15px; border-radius: 12px; }
+.toast{
+  position:fixed; bottom:20px; right:20px;
+  background:var(--ink); color:var(--paper);
+  font-family:'IBM Plex Mono',monospace;
+  font-size:12.5px;
+  padding:12px 18px;
+  border-radius:3px;
+  z-index:100;
+  box-shadow:0 6px 18px rgba(0,0,0,.25);
+}
 
-        /* ===== TABEL PASSWORD ===== */
-        .user-password-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
-        .user-password-table th { background: #1e293b; color: white; padding: 10px 12px; text-align: left; }
-        .user-password-table td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
-        .user-password-table tr:hover td { background: #f1f5f9; }
-        .btn-reset { background: #f59e0b; color: white; border: none; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 12px; font-weight: 600; }
-        .btn-reset:hover { background: #d97706; }
+.stat-box{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-left:4px solid var(--forest);
+  padding:16px 18px;
+}
+.stat-box .num{ font-family:'Bitter',serif; font-size:30px; font-weight:700; line-height:1; }
+.stat-box .lbl{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-soft); margin-top:6px; }
 
-        /* ===== RESPONSIVE ===== */
-        @media (max-width: 768px) {
-            .card-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-            .dpl-grid { grid-template-columns: 1fr; }
-            .item-card { flex-direction: column; align-items: stretch; }
-            .item-card img { width: 100%; height: 180px; object-fit: cover; }
-            .ketua-stat { grid-template-columns: 1fr 1fr; }
-            #login-page { margin: 30px 10px; padding: 25px; }
-            .logout-btn { top: 10px; right: 10px; padding: 8px 14px; font-size: 13px; }
-        }
-        @media (max-width: 480px) {
-            .card-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-            .card { padding: 15px 8px; }
-            .card h3 { font-size: 13px; }
-            .ketua-stat { grid-template-columns: 1fr 1fr; gap: 8px; }
-            .ketua-stat .stat .number { font-size: 24px; }
-        }
-    </style>
+@media (max-width: 860px){
+  .sidebar{ width:100%; min-height:auto; position:sticky; top:0; z-index:40; }
+  .sidebar-brand{ display:none; }
+  .nav-row{ display:flex; overflow-x:auto; }
+  .nav-item{ padding:12px 14px; border-left:none; border-bottom:3px solid transparent; white-space:nowrap; }
+  .nav-item.active{ border-bottom-color:var(--ochre); border-left:none; }
+  .sidebar-user{ display:none; }
+  .app-shell{ flex-direction:column; }
+}
+
+.focus-ring:focus-visible{ outline:2px solid var(--ochre); outline-offset:2px; }
+</style>
 </head>
 <body>
 
-<button class="logout-btn" id="logoutBtn" style="display:none;" onclick="logout()">🚪 Logout</button>
+<!-- ============================================================
+     AUTH SCREEN
+     ============================================================ -->
+<div id="authScreen" style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;">
+  <div style="width:100%; max-width:400px;">
+    <div class="letterhead" style="text-align:center; border-bottom:none;">
+      <div class="eyebrow">Kuliah Kerja Nyata &middot; 1 Bulan</div>
+      <h1>Sistem Manajemen KKN</h1>
+      <p style="color:var(--ink-soft); font-size:13px; margin-top:6px;">Buku lapangan digital kepanitiaan</p>
+    </div>
 
-<div class="container" id="app">
-    <!-- LOGIN -->
-    <div id="login-page">
-        <h2>🔐 Login</h2>
-        <div id="loginForm">
-            <div class="form-group"><label>Email</label><input type="email" id="loginEmail" placeholder="email@example.com" /></div>
-            <div class="form-group"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" /></div>
-            <button class="btn-primary" onclick="login()" style="width:100%;">Masuk</button>
-            <p style="margin-top:10px; font-size:14px; color:#64748b;">Akun bawaan: <strong>ketua@panitia.com</strong> (password: rahasia123)</p>
-            <p style="font-size:14px; color:#2563eb;">🔑 Super Admin: <strong>admin@panitia.com</strong> (password: admin123) — bebas akses</p>
-            <p class="auth-toggle" onclick="toggleAuth('register')">Belum punya akun? Daftar di sini</p>
-            <div id="loginMessage"></div>
-            <div id="resetMessage"></div>
-            <span class="reset-link" onclick="resetPassword()">🔓 Lupa Password? Reset di sini</span>
+    <div class="card" style="padding:22px;">
+      <!-- LOGIN FORM -->
+      <div id="loginForm">
+        <div style="margin-bottom:14px;">
+          <label>Email</label>
+          <input type="email" id="loginEmail" placeholder="nama@kelompok.id" autocomplete="username">
         </div>
-        <div id="registerForm" style="display:none;">
-            <div class="form-group"><label>Email</label><input type="email" id="registerEmail" placeholder="email@example.com" /></div>
-            <div class="form-group"><label>Password</label><input type="password" id="registerPassword" placeholder="••••••••" /></div>
-            <button class="btn-primary" onclick="register()" style="width:100%;">Daftar</button>
-            <p class="auth-toggle" onclick="toggleAuth('login')">Sudah punya akun? Login</p>
-            <div id="registerMessage"></div>
+        <div style="margin-bottom:16px;">
+          <label>Kata Sandi</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
         </div>
-    </div>
+        <button class="btn" style="width:100%;" onclick="doLogin()">Masuk</button>
+        <p id="loginError" style="color:var(--brick); font-size:12.5px; margin-top:10px;"></p>
+        <p style="text-align:center; font-size:12.5px; margin-top:16px; color:var(--ink-soft);">
+          Belum punya akun? <a href="#" onclick="toggleAuthForm(event)" style="color:var(--forest); font-weight:600;">Daftar di sini</a>
+        </p>
+      </div>
 
-    <!-- HOME -->
-    <div id="page-home" class="page">
-        <h1 style="text-align:center; margin-bottom:10px;">📋 Pilih Divisi</h1>
-        <div id="profileCard" class="profile-card"></div>
-        <div class="card-grid" id="menuCards"></div>
-        <p style="text-align:center; color:#94a3b8; font-size:14px;">⚠️ Upload melewati deadline akan tercatat sebagai <strong>Pelanggaran</strong></p>
+      <!-- REGISTER FORM -->
+      <div id="registerForm" class="hidden">
+        <div style="margin-bottom:14px;">
+          <label>Nama Lengkap</label>
+          <input type="text" id="regNama" placeholder="Nama sesuai KTP">
+        </div>
+        <div style="margin-bottom:14px;">
+          <label>Email</label>
+          <input type="email" id="regEmail" placeholder="nama@kelompok.id" autocomplete="username">
+        </div>
+        <div style="margin-bottom:14px;">
+          <label>Kata Sandi</label>
+          <input type="password" id="regPassword" placeholder="Minimal 6 karakter" autocomplete="new-password">
+        </div>
+        <div style="margin-bottom:14px;">
+          <label>Divisi / Seksi</label>
+          <select id="regRole">
+            <option value="bph">BPH (Badan Pengurus Harian)</option>
+            <option value="akademi">Sie Akademi</option>
+            <option value="humas">Sie Humas</option>
+            <option value="pdd">Sie PDD</option>
+            <option value="acara">Sie Acara</option>
+          </select>
+        </div>
+        <div style="margin-bottom:16px;">
+          <label>Jabatan (opsional)</label>
+          <input type="text" id="regJabatan" placeholder="cth. Koordinator, Anggota">
+        </div>
+        <button class="btn" style="width:100%;" onclick="doRegister()">Daftar</button>
+        <p id="registerError" style="color:var(--brick); font-size:12.5px; margin-top:10px;"></p>
+        <p style="text-align:center; font-size:12.5px; margin-top:16px; color:var(--ink-soft);">
+          Sudah punya akun? <a href="#" onclick="toggleAuthForm(event)" style="color:var(--forest); font-weight:600;">Masuk</a>
+        </p>
+      </div>
     </div>
-
-    <!-- DYNAMIC -->
-    <div id="page-dynamic" class="page">
-        <button class="back-btn" onclick="goHome()">⬅ Kembali ke Utama</button>
-        <h2 id="dynamic-title">Judul</h2>
-        <div id="dynamic-content"></div>
-    </div>
+  </div>
 </div>
 
+<!-- ============================================================
+     APP SHELL
+     ============================================================ -->
+<div id="appScreen" class="hidden app-shell" style="display:flex;">
+  <nav class="sidebar" style="display:flex; flex-direction:column;">
+    <div class="sidebar-brand">
+      <div class="mark">KKN — Buku Lapangan</div>
+      <div class="sub">SISTEM MANAJEMEN KEPANITIAAN</div>
+    </div>
+    <div class="nav-row" style="flex:1; display:flex; flex-direction:column; padding-top:8px;">
+      <div class="nav-item active" data-section="dashboard" onclick="switchSection('dashboard')"><span class="num">01</span> Dasbor</div>
+      <div class="nav-item" data-section="anggota" onclick="switchSection('anggota')"><span class="num">02</span> Anggota</div>
+      <div class="nav-item" data-section="tugas" onclick="switchSection('tugas')"><span class="num">03</span> Tugas</div>
+      <div class="nav-item" data-section="keuangan" onclick="switchSection('keuangan')"><span class="num">04</span> Keuangan</div>
+      <div class="nav-item" data-section="jadwal" onclick="switchSection('jadwal')"><span class="num">05</span> Jadwal</div>
+      <div class="nav-item" data-section="dokumen" onclick="switchSection('dokumen')"><span class="num">06</span> Dokumen</div>
+    </div>
+    <div class="sidebar-user">
+      <div class="name" id="sbUserName">-</div>
+      <div class="role-badge" id="sbUserRole">-</div>
+      <div class="logout-btn" onclick="doLogout()">Keluar</div>
+    </div>
+  </nav>
+
+  <main style="flex:1; padding:28px 32px; max-width:1100px;">
+
+    <!-- DASHBOARD -->
+    <section id="sec-dashboard">
+      <div class="letterhead">
+        <div class="eyebrow">Ringkasan &middot; <span id="todayDate" class="font-mono"></span></div>
+        <h1>Dasbor Kepanitiaan</h1>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:28px;">
+        <div class="stat-box"><div class="num" id="statAnggota">0</div><div class="lbl">Anggota</div></div>
+        <div class="stat-box" style="border-left-color:var(--ochre);"><div class="num" id="statTugasProses">0</div><div class="lbl">Tugas Proses</div></div>
+        <div class="stat-box" style="border-left-color:var(--forest);"><div class="num" id="statTugasSelesai">0</div><div class="lbl">Tugas Selesai</div></div>
+        <div class="stat-box" style="border-left-color:var(--brick);"><div class="num font-mono" id="statSaldo">Rp 0</div><div class="lbl">Saldo Kas</div></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+        <div class="card" style="padding:18px;">
+          <h3 style="margin:0 0 12px; font-size:15px;">Tugas Terbaru</h3>
+          <div id="dashTugasList" style="font-size:13px;"></div>
+        </div>
+        <div class="card" style="padding:18px;">
+          <h3 style="margin:0 0 12px; font-size:15px;">Agenda Terdekat</h3>
+          <div id="dashJadwalList" style="font-size:13px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ANGGOTA -->
+    <section id="sec-anggota" class="hidden">
+      <div class="letterhead">
+        <div class="eyebrow">Data Kepanitiaan</div>
+        <h1>Anggota &amp; Divisi</h1>
+      </div>
+      <div id="anggotaTableWrap" class="card" style="padding:6px 18px; overflow-x:auto;">
+        <table>
+          <thead><tr><th>Nama</th><th>Divisi</th><th>Jabatan</th><th>Email</th><th></th></tr></thead>
+          <tbody id="anggotaTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TUGAS -->
+    <section id="sec-tugas" class="hidden">
+      <div class="letterhead" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div class="eyebrow">Manajemen Kerja</div>
+          <h1>Tugas per Divisi</h1>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <select id="filterDivisiTugas" onchange="renderTugas()" style="width:auto;">
+            <option value="semua">Semua Divisi</option>
+            <option value="bph">BPH</option>
+            <option value="akademi">Akademi</option>
+            <option value="humas">Humas</option>
+            <option value="pdd">PDD</option>
+            <option value="acara">Acara</option>
+          </select>
+          <button class="btn" onclick="openTugasModal()">+ Tugas Baru</button>
+        </div>
+      </div>
+      <div id="tugasGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px;"></div>
+    </section>
+
+    <!-- KEUANGAN -->
+    <section id="sec-keuangan" class="hidden">
+      <div class="letterhead" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div class="eyebrow">Buku Kas</div>
+          <h1>Keuangan</h1>
+        </div>
+        <button class="btn" onclick="openKeuanganModal()">+ Catat Transaksi</button>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:20px;">
+        <div class="stat-box"><div class="num font-mono" id="kMasuk">Rp 0</div><div class="lbl">Total Pemasukan</div></div>
+        <div class="stat-box" style="border-left-color:var(--brick);"><div class="num font-mono" id="kKeluar">Rp 0</div><div class="lbl">Total Pengeluaran</div></div>
+        <div class="stat-box" style="border-left-color:var(--ochre);"><div class="num font-mono" id="kSaldo">Rp 0</div><div class="lbl">Saldo Akhir</div></div>
+      </div>
+      <div class="card" style="padding:6px 18px; overflow-x:auto;">
+        <table>
+          <thead><tr><th>Tanggal</th><th>Keterangan</th><th>Tipe</th><th>Jumlah</th><th>Dicatat oleh</th><th></th></tr></thead>
+          <tbody id="keuanganTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- JADWAL -->
+    <section id="sec-jadwal" class="hidden">
+      <div class="letterhead" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div class="eyebrow">Linimasa 30 Hari</div>
+          <h1>Jadwal Kegiatan</h1>
+        </div>
+        <button class="btn" onclick="openJadwalModal()">+ Tambah Agenda</button>
+      </div>
+      <div id="jadwalList"></div>
+    </section>
+
+    <!-- DOKUMEN -->
+    <section id="sec-dokumen" class="hidden">
+      <div class="letterhead" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div class="eyebrow">Arsip</div>
+          <h1>Dokumen &amp; Proposal</h1>
+        </div>
+        <button class="btn" onclick="openDokumenModal()">+ Unggah Dokumen</button>
+      </div>
+      <div id="dokumenGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px;"></div>
+    </section>
+
+  </main>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
 <script>
-// ================================================================
-// 1. KONFIGURASI FIREBASE (ASLI DARI PROYEK ANDA)
-// ================================================================
+/* ============================================================
+   FIREBASE CONFIG
+   GANTI dengan konfigurasi Firebase project Anda sendiri.
+   Firebase Console -> Project Settings -> General -> Your apps -> SDK setup
+   ============================================================ */
 const firebaseConfig = {
-  apiKey: "AIzaSyCQoVlowDQUXFwjgLsXsn3Y4KWJark8SWs",
-  authDomain: "kepanitiaan-37abe.firebaseapp.com",
-  projectId: "kepanitiaan-37abe",
-  storageBucket: "kepanitiaan-37abe.firebasestorage.app",
-  messagingSenderId: "865151434968",
-  appId: "1:865151434968:web:420c53bf68d007d3c017ad",
-  measurementId: "G-MPD2KQ3NF3"
+  apiKey: "GANTI_DENGAN_API_KEY_ANDA",
+  authDomain: "GANTI.firebaseapp.com",
+  projectId: "GANTI",
+  storageBucket: "GANTI.appspot.com",
+  messagingSenderId: "GANTI",
+  appId: "GANTI"
 };
 
-// Inisialisasi Firebase
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
 
-// ================================================================
-// 2. VARIABEL GLOBAL
-// ================================================================
-let currentUser = null;
-let currentUserRole = null;
-let currentUserPoints = 0;
-const DIVISIONS = ['acara', 'logistik', 'akademi', 'dekdok'];
-const SALT = 'rahasiaPanitia2024';
+const ROLE_LABELS = { bph:'BPH', akademi:'Sie Akademi', humas:'Sie Humas', pdd:'Sie PDD', acara:'Sie Acara' };
 
-const DEFAULT_ROLES = {
-    'ketua@panitia.com': 'ketua',
-    'bendahara@panitia.com': 'bendahara',
-    'sekretaris@panitia.com': 'sekretaris',
-    'sie_acara@panitia.com': 'sie_acara',
-    'sie_logistik@panitia.com': 'sie_logistik',
-    'sie_akademi@panitia.com': 'sie_akademi',
-    'sie_dekdok@panitia.com': 'sie_dekdok',
-    'humas@panitia.com': 'humas',
-    'dpl@panitia.com': 'dpl',
-    'admin@panitia.com': 'superadmin'
-};
+let currentUser = null;   // firebase auth user
+let currentProfile = null; // firestore users/{uid} doc
+let unsubscribers = [];   // active onSnapshot listeners, cleaned on logout
 
-const MENU_LABEL = {
-    superadmin: { label: '👑 Super Admin', desc: 'Testing - Full Akses' },
-    ketua: { label: '👤 Ketua', desc: 'Set Deadline & Pantau' },
-    bendahara: { label: '💰 Bendahara', desc: 'Input Keuangan' },
-    sekretaris: { label: '📝 Sekretaris', desc: 'Logbook & Rekap' },
-    acara: { label: '🎉 Sie Acara', desc: 'Kegiatan' },
-    logistik: { label: '📦 Sie Logistik', desc: 'Kegiatan' },
-    akademi: { label: '📚 Sie Akademi', desc: 'Kegiatan' },
-    dekdok: { label: '📸 Sie Dekdok', desc: 'Kegiatan' },
-    humas: { label: '📢 Humas', desc: 'Lihat semua & dokumentasi' },
-    dpl: { label: '👀 DPL Monitoring', desc: 'Pantau semua aktivitas' }
-};
+let cache = { users:[], tasks:[], finance:[], timeline:[], documents:[] };
 
-// ================================================================
-// 3. FUNGSI AUTH
-// ================================================================
-function toggleAuth(mode) {
-    document.getElementById('loginForm').style.display = mode === 'login' ? 'block' : 'none';
-    document.getElementById('registerForm').style.display = mode === 'register' ? 'block' : 'none';
+/* ---------------- helpers ---------------- */
+function toast(msg){
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.getElementById('toastRoot').appendChild(el);
+  setTimeout(()=> el.remove(), 3200);
+}
+function rupiah(n){
+  n = Number(n)||0;
+  return 'Rp ' + n.toLocaleString('id-ID');
+}
+function fmtDate(d){
+  if(!d) return '-';
+  const dt = (d.toDate) ? d.toDate() : new Date(d);
+  return dt.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+}
+function isBPH(){ return currentProfile && currentProfile.role === 'bph'; }
+function canManage(divisi){ return isBPH() || (currentProfile && currentProfile.role === divisi); }
+
+/* ---------------- AUTH ---------------- */
+function toggleAuthForm(e){
+  e.preventDefault();
+  document.getElementById('loginForm').classList.toggle('hidden');
+  document.getElementById('registerForm').classList.toggle('hidden');
 }
 
-async function login() {
-    const email = document.getElementById('loginEmail').value.trim();
-    const pass = document.getElementById('loginPassword').value;
-    const msg = document.getElementById('loginMessage');
-    msg.innerText = '';
-    try {
-        await auth.signInWithEmailAndPassword(email, pass);
-    } catch (e) {
-        // Jika akun bawaan belum dibuat, buat otomatis
-        if (e.code === 'auth/user-not-found' && DEFAULT_ROLES[email]) {
-            try {
-                const cred = await auth.createUserWithEmailAndPassword(email, pass);
-                const role = DEFAULT_ROLES[email];
-                const isFirstLogin = role === 'superadmin' ? false : true;
-                await db.collection('users').doc(cred.user.uid).set({
-                    email: email,
-                    role: role,
-                    points: 0,
-                    isFirstLogin: isFirstLogin,
-                    canChangePassword: role === 'superadmin' ? false : true,
-                    createdAt: new Date()
-                });
-                await auth.signInWithEmailAndPassword(email, pass);
-            } catch (err) {
-                msg.innerText = '❌ Gagal membuat akun bawaan: ' + err.message;
-            }
-        } else {
-            msg.innerText = '❌ ' + e.message;
-        }
-    }
+function doRegister(){
+  const nama = document.getElementById('regNama').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const role = document.getElementById('regRole').value;
+  const jabatan = document.getElementById('regJabatan').value.trim();
+  const errEl = document.getElementById('registerError');
+  errEl.textContent = '';
+
+  if(!nama || !email || password.length < 6){
+    errEl.textContent = 'Lengkapi semua data. Kata sandi minimal 6 karakter.';
+    return;
+  }
+
+  auth.createUserWithEmailAndPassword(email, password)
+    .then(cred => {
+      return db.collection('users').doc(cred.user.uid).set({
+        nama, email, role, jabatan: jabatan || '',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    })
+    .catch(err => { errEl.textContent = translateAuthError(err); });
 }
 
-async function register() {
-    const email = document.getElementById('registerEmail').value.trim();
-    const pass = document.getElementById('registerPassword').value;
-    const msg = document.getElementById('registerMessage');
-    msg.innerText = '';
-    try {
-        const cred = await auth.createUserWithEmailAndPassword(email, pass);
-        await db.collection('users').doc(cred.user.uid).set({
-            email: email,
-            role: 'member',
-            points: 0,
-            isFirstLogin: true,
-            canChangePassword: true,
-            createdAt: new Date()
-        });
-        msg.innerText = '✅ Akun berhasil dibuat! Silakan login.';
-        document.getElementById('registerEmail').value = '';
-        document.getElementById('registerPassword').value = '';
-        toggleAuth('login');
-    } catch (e) {
-        msg.innerText = '❌ ' + e.message;
-    }
+function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  auth.signInWithEmailAndPassword(email, password)
+    .catch(err => { errEl.textContent = translateAuthError(err); });
 }
 
-function logout() {
-    auth.signOut();
+function doLogout(){
+  unsubscribers.forEach(u => u());
+  unsubscribers = [];
+  auth.signOut();
 }
 
-async function resetPassword() {
-    const email = prompt('Masukkan email Anda untuk menerima link reset password:');
-    if (!email) return;
-    try {
-        await auth.sendPasswordResetEmail(email);
-        document.getElementById('resetMessage').innerHTML = '✅ Email reset telah dikirim. Cek kotak masuk/spam.';
-    } catch (e) {
-        alert('Gagal: ' + e.message);
-    }
+function translateAuthError(err){
+  const map = {
+    'auth/api-key-not-valid.-please-pass-a-valid-api-key.': 'Konfigurasi Firebase belum benar. Ganti firebaseConfig di index.html dengan API key asli.',
+    'auth/email-already-in-use': 'Email sudah terdaftar.',
+    'auth/invalid-email': 'Format email tidak valid.',
+    'auth/weak-password': 'Kata sandi terlalu lemah (minimal 6 karakter).',
+    'auth/user-not-found': 'Akun tidak ditemukan.',
+    'auth/wrong-password': 'Kata sandi salah.',
+    'auth/invalid-credential': 'Email atau kata sandi salah.'
+  };
+  const code = (err.code || '').toLowerCase();
+  return map[code] || (err.message || 'Terjadi kesalahan.');
 }
 
-// ================================================================
-// 4. ENKRIPSI / DEKRIPSI & POIN
-// ================================================================
-function encryptPassword(pwd) {
-    return btoa(pwd + SALT);
-}
-function decryptPassword(enc) {
-    return atob(enc).replace(SALT, '');
-}
-
-async function addPoints(uid, inc) {
-    try {
-        await db.collection('users').doc(uid).update({
-            points: firebase.firestore.FieldValue.increment(inc)
-        });
-    } catch (e) {
-        console.error('Gagal tambah poin:', e);
-    }
-}
-
-// ================================================================
-// 5. EXPORT WORD
-// ================================================================
-async function exportActivitiesToWord() {
-    try {
-        const snap = await db.collection('activities').orderBy('timestamp', 'desc').get();
-        if (snap.empty) {
-            alert('Belum ada data untuk dicetak.');
-            return;
-        }
-        let rows = '';
-        let no = 1;
-        snap.forEach(doc => {
-            const d = doc.data();
-            const ts = d.timestamp?.toDate?.() || new Date();
-            const status = d.isLate ? 'TERLAMBAT' : 'TEPAT';
-            rows += `
-                <tr>
-                    <td>${no}</td>
-                    <td>${d.division.toUpperCase()}</td>
-                    <td>${d.title}</td>
-                    <td>${d.desc || ''}</td>
-                    <td>${ts.toLocaleString('id-ID')}</td>
-                    <td>${status}</td>
-                </tr>
-            `;
-            no++;
-        });
-
-        const style = `
-            <style>
-                table { border-collapse: collapse; width: 100%; font-family: Arial; font-size: 12px; }
-                th, td { border: 1px solid #333; padding: 6px; text-align: left; }
-                th { background: #2563eb; color: white; }
-            </style>
-        `;
-        const htmlContent = `
-            <html>
-                <head><meta charset="UTF-8">${style}</head>
-                <body>
-                    <h2>📋 Laporan Kegiatan Panitia</h2>
-                    <p>Dicetak pada ${new Date().toLocaleString('id-ID')}</p>
-                    <table>
-                        <thead>
-                            <tr><th>No</th><th>Divisi</th><th>Judul</th><th>Deskripsi</th><th>Tanggal</th><th>Status</th></tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
-                    </table>
-                </body>
-            </html>
-        `;
-
-        const blob = new Blob([htmlContent], { type: 'application/msword' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `Laporan_Kegiatan_${new Date().toISOString().slice(0,10)}.doc`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-    } catch (e) {
-        alert('Gagal cetak: ' + e.message);
-    }
-}
-
-// ================================================================
-// 6. AUTH STATE OBSERVER
-// ================================================================
-auth.onAuthStateChanged(async (user) => {
-    if (user) {
-        currentUser = user;
-        document.getElementById('logoutBtn').style.display = 'block';
-        document.getElementById('login-page').style.display = 'none';
-
-        // Catat log login
-        try {
-            await db.collection('login_logs').add({
-                uid: user.uid,
-                email: user.email,
-                timestamp: new Date()
-            });
-        } catch (e) {}
-
-        // Ambil data user
-        try {
-            const docSnap = await db.collection('users').doc(user.uid).get();
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                currentUserRole = data.role || 'member';
-                currentUserPoints = data.points || 0;
-
-                // Superadmin langsung masuk tanpa force change password
-                if (currentUserRole === 'superadmin') {
-                    showHome();
-                    return;
-                }
-
-                // Cek apakah harus ganti password pertama kali
-                if (data.isFirstLogin) {
-                    const newPass = prompt('⚠️ Anda harus mengganti password sebelum masuk. Masukkan password baru (min 6 karakter):');
-                    if (!newPass || newPass.length < 6) {
-                        alert('Password minimal 6 karakter. Silakan logout dan login kembali.');
-                        auth.signOut();
-                        return;
-                    }
-                    try {
-                        await user.updatePassword(newPass);
-                        await db.collection('users').doc(user.uid).update({
-                            passwordEncrypted: encryptPassword(newPass),
-                            isFirstLogin: false,
-                            canChangePassword: false
-                        });
-                        alert('✅ Password berhasil diubah! Silakan login kembali.');
-                        auth.signOut();
-                        return;
-                    } catch (e) {
-                        alert('Gagal mengganti password: ' + e.message);
-                        auth.signOut();
-                        return;
-                    }
-                }
-            } else {
-                // Jika dokumen belum ada (misal akun dibuat via console)
-                await db.collection('users').doc(user.uid).set({
-                    email: user.email,
-                    role: 'member',
-                    points: 0,
-                    isFirstLogin: true,
-                    canChangePassword: true,
-                    createdAt: new Date()
-                });
-                currentUserRole = 'member';
-                currentUserPoints = 0;
-                const newPass = prompt('⚠️ Anda harus mengganti password sebelum masuk. Masukkan password baru (min 6 karakter):');
-                if (!newPass || newPass.length < 6) {
-                    alert('Password minimal 6 karakter. Silakan logout dan login kembali.');
-                    auth.signOut();
-                    return;
-                }
-                try {
-                    await user.updatePassword(newPass);
-                    await db.collection('users').doc(user.uid).update({
-                        passwordEncrypted: encryptPassword(newPass),
-                        isFirstLogin: false,
-                        canChangePassword: false
-                    });
-                    alert('✅ Password berhasil diubah! Silakan login kembali.');
-                    auth.signOut();
-                    return;
-                } catch (e) {
-                    alert('Gagal mengganti password: ' + e.message);
-                    auth.signOut();
-                    return;
-                }
-            }
-        } catch (e) {
-            console.error('Gagal ambil data user:', e);
-            currentUserRole = 'member';
-            currentUserPoints = 0;
-        }
-        showHome();
-    } else {
-        // User logout
-        currentUser = null;
-        currentUserRole = null;
-        currentUserPoints = 0;
-        document.getElementById('logoutBtn').style.display = 'none';
-        document.getElementById('login-page').style.display = 'block';
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        document.getElementById('page-home').classList.remove('active');
-        document.getElementById('page-dynamic').classList.remove('active');
-        document.getElementById('loginForm').style.display = 'block';
-        document.getElementById('registerForm').style.display = 'none';
-        document.getElementById('loginMessage').innerText = '';
-        document.getElementById('registerMessage').innerText = '';
-        document.getElementById('resetMessage').innerHTML = '';
-    }
+auth.onAuthStateChanged(user => {
+  if(user){
+    currentUser = user;
+    db.collection('users').doc(user.uid).get().then(doc => {
+      if(!doc.exists){ toast('Profil tidak ditemukan.'); doLogout(); return; }
+      currentProfile = doc.data();
+      document.getElementById('authScreen').classList.add('hidden');
+      document.getElementById('appScreen').classList.remove('hidden');
+      document.getElementById('sbUserName').textContent = currentProfile.nama;
+      document.getElementById('sbUserRole').textContent = ROLE_LABELS[currentProfile.role] || currentProfile.role;
+      document.getElementById('todayDate').textContent = new Date().toLocaleDateString('id-ID',{ weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+      attachListeners();
+    });
+  } else {
+    currentUser = null; currentProfile = null;
+    document.getElementById('appScreen').classList.add('hidden');
+    document.getElementById('authScreen').classList.remove('hidden');
+  }
 });
 
-// ================================================================
-// 7. HOME & NAVIGASI
-// ================================================================
-function getCurrentAllowedRoles() {
-    if (currentUserRole === 'superadmin' || currentUserRole === 'ketua') {
-        return ['ketua', 'bendahara', 'sekretaris', 'acara', 'logistik', 'akademi', 'dekdok', 'humas', 'dpl'];
-    }
-    if (currentUserRole === 'bendahara') return ['bendahara'];
-    if (currentUserRole === 'sekretaris') return ['sekretaris'];
-    if (currentUserRole === 'sie_acara') return ['acara'];
-    if (currentUserRole === 'sie_logistik') return ['logistik'];
-    if (currentUserRole === 'sie_akademi') return ['akademi'];
-    if (currentUserRole === 'sie_dekdok') return ['dekdok'];
-    if (currentUserRole === 'humas') return ['humas'];
-    if (currentUserRole === 'dpl') return ['dpl'];
-    return [];
+/* ---------------- NAVIGATION ---------------- */
+function switchSection(name){
+  document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+  document.getElementById('sec-'+name).classList.remove('hidden');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.section === name));
 }
 
-function showHome() {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById('page-home').classList.add('active');
-    document.getElementById('page-dynamic').classList.remove('active');
+/* ---------------- REALTIME LISTENERS ---------------- */
+function attachListeners(){
+  unsubscribers.push(db.collection('users').orderBy('nama').onSnapshot(snap => {
+    cache.users = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    renderAnggota(); renderDashboard();
+  }));
+  unsubscribers.push(db.collection('tasks').orderBy('createdAt','desc').onSnapshot(snap => {
+    cache.tasks = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    renderTugas(); renderDashboard();
+  }));
+  unsubscribers.push(db.collection('finance').orderBy('tanggal','desc').onSnapshot(snap => {
+    cache.finance = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    renderKeuangan(); renderDashboard();
+  }));
+  unsubscribers.push(db.collection('timeline').orderBy('tanggal','asc').onSnapshot(snap => {
+    cache.timeline = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    renderJadwal(); renderDashboard();
+  }));
+  unsubscribers.push(db.collection('documents').orderBy('createdAt','desc').onSnapshot(snap => {
+    cache.documents = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    renderDokumen();
+  }));
+}
 
-    // Update profile
-    const profile = document.getElementById('profileCard');
-    if (currentUser) {
-        profile.innerHTML = `
-            <div class="info">
-                <span>📧 ${currentUser.email}</span>
-                <span>🎯 Role: <strong>${currentUserRole}</strong></span>
-            </div>
-            <div class="points">⭐ Poin: ${currentUserPoints}</div>
-        `;
-    } else {
-        profile.innerHTML = '';
-    }
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+function renderDashboard(){
+  document.getElementById('statAnggota').textContent = cache.users.length;
+  document.getElementById('statTugasProses').textContent = cache.tasks.filter(t=>t.status==='proses').length;
+  document.getElementById('statTugasSelesai').textContent = cache.tasks.filter(t=>t.status==='selesai').length;
+  const saldo = cache.finance.reduce((s,f)=> s + (f.tipe==='masuk' ? Number(f.jumlah) : -Number(f.jumlah)), 0);
+  document.getElementById('statSaldo').textContent = rupiah(saldo);
 
-    // Render menu berdasarkan role
-    const container = document.getElementById('menuCards');
-    let allowed = getCurrentAllowedRoles();
-    if (allowed.length === 0) {
-        container.innerHTML = `<p style="grid-column:1/-1; text-align:center; color:#b91c1c;">❌ Role Anda (${currentUserRole}) tidak memiliki akses. Hubungi admin.</p>`;
-        return;
-    }
-    let html = '';
-    allowed.forEach(key => {
-        const info = MENU_LABEL[key];
-        if (info) html += `<div class="card" onclick="navigateTo('${key}')"><h3>${info.label}</h3><span class="badge">${info.desc}</span></div>`;
+  const dashTugas = cache.tasks.slice(0,5).map(t => `
+    <div style="padding:8px 0; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:10px;">
+      <span>${escapeHtml(t.judul)} <span class="font-mono" style="color:var(--ink-soft); font-size:11px;">· ${ROLE_LABELS[t.divisi]||t.divisi}</span></span>
+      <span class="stamp stamp-${t.status}" style="font-size:9px; padding:2px 6px;">${labelStatus(t.status)}</span>
+    </div>`).join('') || '<p style="color:var(--ink-soft);">Belum ada tugas.</p>';
+  document.getElementById('dashTugasList').innerHTML = dashTugas;
+
+  const upcoming = cache.timeline.filter(j => !j.tanggal || (j.tanggal.toDate ? j.tanggal.toDate() : new Date(j.tanggal)) >= new Date(new Date().toDateString())).slice(0,5);
+  const dashJadwal = upcoming.map(j => `
+    <div style="padding:8px 0; border-bottom:1px solid var(--line);">
+      <span class="font-mono" style="color:var(--ink-soft); font-size:11px;">${fmtDate(j.tanggal)}</span> — ${escapeHtml(j.kegiatan)}
+    </div>`).join('') || '<p style="color:var(--ink-soft);">Belum ada agenda.</p>';
+  document.getElementById('dashJadwalList').innerHTML = dashJadwal;
+}
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function labelStatus(s){ return { belum:'Belum', proses:'Proses', selesai:'Selesai' }[s] || s; }
+
+/* ============================================================
+   ANGGOTA
+   ============================================================ */
+function renderAnggota(){
+  const tbody = document.getElementById('anggotaTbody');
+  tbody.innerHTML = cache.users.map(u => `
+    <tr>
+      <td>${escapeHtml(u.nama)}</td>
+      <td>${ROLE_LABELS[u.role]||u.role}</td>
+      <td>${escapeHtml(u.jabatan||'-')}</td>
+      <td class="font-mono" style="font-size:12px;">${escapeHtml(u.email)}</td>
+      <td>${isBPH() ? `<button class="btn btn-outline btn-sm" onclick="editAnggotaRole('${u.id}')">Ubah Divisi</button>` : ''}</td>
+    </tr>`).join('') || `<tr><td colspan="5" style="color:var(--ink-soft);">Belum ada anggota.</td></tr>`;
+}
+
+function editAnggotaRole(uid){
+  const u = cache.users.find(x=>x.id===uid);
+  if(!u) return;
+  const options = Object.keys(ROLE_LABELS).map(k => `<option value="${k}" ${u.role===k?'selected':''}>${ROLE_LABELS[k]}</option>`).join('');
+  showModal(`
+    <h3 style="margin-top:0;">Ubah Divisi — ${escapeHtml(u.nama)}</h3>
+    <div style="margin-bottom:14px;"><label>Divisi</label><select id="editRoleSelect">${options}</select></div>
+    <div style="margin-bottom:16px;"><label>Jabatan</label><input id="editJabatanInput" value="${escapeHtml(u.jabatan||'')}"></div>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+      <button class="btn" onclick="saveAnggotaRole('${uid}')">Simpan</button>
+    </div>`);
+}
+function saveAnggotaRole(uid){
+  const role = document.getElementById('editRoleSelect').value;
+  const jabatan = document.getElementById('editJabatanInput').value.trim();
+  db.collection('users').doc(uid).update({ role, jabatan }).then(()=>{ toast('Divisi diperbarui.'); closeModal(); });
+}
+
+/* ============================================================
+   TUGAS
+   ============================================================ */
+function renderTugas(){
+  const filter = document.getElementById('filterDivisiTugas').value;
+  const list = cache.tasks.filter(t => filter==='semua' || t.divisi===filter);
+  const grid = document.getElementById('tugasGrid');
+  grid.innerHTML = list.map(t => `
+    <div class="card card-perforated" style="padding:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+        <h3 style="margin:0; font-size:15.5px;">${escapeHtml(t.judul)}</h3>
+        <span class="stamp stamp-${t.status}">${labelStatus(t.status)}</span>
+      </div>
+      <p style="font-size:13px; color:var(--ink-soft); margin:8px 0;">${escapeHtml(t.deskripsi||'')}</p>
+      <div class="font-mono" style="font-size:11px; color:var(--ink-soft); margin-bottom:10px;">
+        ${ROLE_LABELS[t.divisi]||t.divisi} · PJ: ${escapeHtml(t.penanggungJawab||'-')} · Deadline: ${t.deadline ? fmtDate(t.deadline) : '-'}
+      </div>
+      ${canManage(t.divisi) ? `
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <select onchange="updateTugasStatus('${t.id}', this.value)" style="width:auto; font-size:11.5px; padding:5px 8px;">
+          <option value="belum" ${t.status==='belum'?'selected':''}>Belum</option>
+          <option value="proses" ${t.status==='proses'?'selected':''}>Proses</option>
+          <option value="selesai" ${t.status==='selesai'?'selected':''}>Selesai</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick='openTugasModal(${JSON.stringify(t).replace(/'/g,"&apos;")})'>Edit</button>
+        ${isBPH() ? `<button class="btn btn-danger btn-sm" onclick="deleteTugas('${t.id}')">Hapus</button>` : ''}
+      </div>` : ''}
+    </div>`).join('') || '<p style="color:var(--ink-soft);">Belum ada tugas untuk divisi ini.</p>';
+}
+
+function openTugasModal(task){
+  task = task || {};
+  const divisiOptions = Object.keys(ROLE_LABELS).map(k => `<option value="${k}" ${task.divisi===k?'selected':''}>${ROLE_LABELS[k]}</option>`).join('');
+  showModal(`
+    <h3 style="margin-top:0;">${task.id ? 'Edit Tugas' : 'Tugas Baru'}</h3>
+    <div style="margin-bottom:12px;"><label>Judul</label><input id="tJudul" value="${escapeHtml(task.judul||'')}"></div>
+    <div style="margin-bottom:12px;"><label>Deskripsi</label><textarea id="tDeskripsi" rows="3">${escapeHtml(task.deskripsi||'')}</textarea></div>
+    <div style="margin-bottom:12px;"><label>Divisi</label><select id="tDivisi">${divisiOptions}</select></div>
+    <div style="margin-bottom:12px;"><label>Penanggung Jawab</label><input id="tPJ" value="${escapeHtml(task.penanggungJawab||'')}"></div>
+    <div style="margin-bottom:16px;"><label>Deadline</label><input type="date" id="tDeadline" value="${task.deadline ? toInputDate(task.deadline) : ''}"></div>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+      <button class="btn" onclick="saveTugas(${task.id ? `'${task.id}'` : 'null'})">Simpan</button>
+    </div>`);
+}
+function toInputDate(d){ const dt = d.toDate ? d.toDate() : new Date(d); return dt.toISOString().slice(0,10); }
+
+function saveTugas(id){
+  const data = {
+    judul: document.getElementById('tJudul').value.trim(),
+    deskripsi: document.getElementById('tDeskripsi').value.trim(),
+    divisi: document.getElementById('tDivisi').value,
+    penanggungJawab: document.getElementById('tPJ').value.trim(),
+    deadline: document.getElementById('tDeadline').value ? new Date(document.getElementById('tDeadline').value) : null
+  };
+  if(!data.judul){ toast('Judul tugas wajib diisi.'); return; }
+  if(id){
+    db.collection('tasks').doc(id).update(data).then(()=>{ toast('Tugas diperbarui.'); closeModal(); });
+  } else {
+    data.status = 'belum';
+    data.createdBy = currentProfile.nama;
+    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    db.collection('tasks').add(data).then(()=>{ toast('Tugas ditambahkan.'); closeModal(); });
+  }
+}
+function updateTugasStatus(id, status){
+  db.collection('tasks').doc(id).update({ status }).then(()=> toast('Status tugas diperbarui.'));
+}
+function deleteTugas(id){
+  if(!confirm('Hapus tugas ini?')) return;
+  db.collection('tasks').doc(id).delete().then(()=> toast('Tugas dihapus.'));
+}
+
+/* ============================================================
+   KEUANGAN
+   ============================================================ */
+function renderKeuangan(){
+  const masuk = cache.finance.filter(f=>f.tipe==='masuk').reduce((s,f)=>s+Number(f.jumlah),0);
+  const keluar = cache.finance.filter(f=>f.tipe==='keluar').reduce((s,f)=>s+Number(f.jumlah),0);
+  document.getElementById('kMasuk').textContent = rupiah(masuk);
+  document.getElementById('kKeluar').textContent = rupiah(keluar);
+  document.getElementById('kSaldo').textContent = rupiah(masuk-keluar);
+
+  document.getElementById('keuanganTbody').innerHTML = cache.finance.map(f => `
+    <tr>
+      <td class="font-mono" style="font-size:12px;">${fmtDate(f.tanggal)}</td>
+      <td>${escapeHtml(f.keterangan)}</td>
+      <td><span class="stamp ${f.tipe==='masuk'?'stamp-selesai':'stamp-belum'}" style="font-size:9px; padding:2px 6px;">${f.tipe==='masuk'?'Masuk':'Keluar'}</span></td>
+      <td class="font-mono">${rupiah(f.jumlah)}</td>
+      <td style="font-size:12px; color:var(--ink-soft);">${escapeHtml(f.createdBy||'-')}</td>
+      <td>${isBPH() ? `<button class="btn btn-danger btn-sm" onclick="deleteKeuangan('${f.id}')">Hapus</button>` : ''}</td>
+    </tr>`).join('') || `<tr><td colspan="6" style="color:var(--ink-soft);">Belum ada transaksi.</td></tr>`;
+}
+
+function openKeuanganModal(){
+  showModal(`
+    <h3 style="margin-top:0;">Catat Transaksi</h3>
+    <div style="margin-bottom:12px;"><label>Tipe</label>
+      <select id="fTipe"><option value="masuk">Pemasukan</option><option value="keluar">Pengeluaran</option></select>
+    </div>
+    <div style="margin-bottom:12px;"><label>Keterangan</label><input id="fKeterangan" placeholder="cth. Dana dari kampus, Konsumsi acara"></div>
+    <div style="margin-bottom:12px;"><label>Jumlah (Rp)</label><input type="number" id="fJumlah" placeholder="0"></div>
+    <div style="margin-bottom:16px;"><label>Tanggal</label><input type="date" id="fTanggal" value="${new Date().toISOString().slice(0,10)}"></div>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+      <button class="btn" onclick="saveKeuangan()">Simpan</button>
+    </div>`);
+}
+function saveKeuangan(){
+  const tipe = document.getElementById('fTipe').value;
+  const keterangan = document.getElementById('fKeterangan').value.trim();
+  const jumlah = Number(document.getElementById('fJumlah').value);
+  const tanggal = document.getElementById('fTanggal').value;
+  if(!keterangan || !jumlah){ toast('Lengkapi keterangan dan jumlah.'); return; }
+  db.collection('finance').add({
+    tipe, keterangan, jumlah, tanggal: new Date(tanggal),
+    createdBy: currentProfile.nama,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(()=>{ toast('Transaksi dicatat.'); closeModal(); });
+}
+function deleteKeuangan(id){
+  if(!confirm('Hapus transaksi ini?')) return;
+  db.collection('finance').doc(id).delete().then(()=> toast('Transaksi dihapus.'));
+}
+
+/* ============================================================
+   JADWAL
+   ============================================================ */
+function renderJadwal(){
+  const wrap = document.getElementById('jadwalList');
+  wrap.innerHTML = cache.timeline.map(j => `
+    <div class="card" style="padding:14px 18px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+      <div>
+        <div class="font-mono" style="font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.05em;">${fmtDate(j.tanggal)} ${j.waktu?('· '+j.waktu):''} · ${ROLE_LABELS[j.divisi]||'Umum'}</div>
+        <div style="font-size:14.5px; margin-top:3px;">${escapeHtml(j.kegiatan)}</div>
+      </div>
+      ${canManage(j.divisi) || isBPH() ? `<button class="btn btn-danger btn-sm" onclick="deleteJadwal('${j.id}')">Hapus</button>` : ''}
+    </div>`).join('') || '<p style="color:var(--ink-soft);">Belum ada agenda.</p>';
+}
+function openJadwalModal(){
+  const divisiOptions = Object.keys(ROLE_LABELS).map(k => `<option value="${k}">${ROLE_LABELS[k]}</option>`).join('');
+  showModal(`
+    <h3 style="margin-top:0;">Tambah Agenda</h3>
+    <div style="margin-bottom:12px;"><label>Kegiatan</label><input id="jKegiatan" placeholder="cth. Rapat koordinasi divisi"></div>
+    <div style="margin-bottom:12px;"><label>Tanggal</label><input type="date" id="jTanggal"></div>
+    <div style="margin-bottom:12px;"><label>Waktu (opsional)</label><input type="time" id="jWaktu"></div>
+    <div style="margin-bottom:16px;"><label>Divisi</label><select id="jDivisi"><option value="umum">Umum (semua divisi)</option>${divisiOptions}</select></div>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+      <button class="btn" onclick="saveJadwal()">Simpan</button>
+    </div>`);
+}
+function saveJadwal(){
+  const kegiatan = document.getElementById('jKegiatan').value.trim();
+  const tanggal = document.getElementById('jTanggal').value;
+  const waktu = document.getElementById('jWaktu').value;
+  const divisi = document.getElementById('jDivisi').value;
+  if(!kegiatan || !tanggal){ toast('Lengkapi kegiatan dan tanggal.'); return; }
+  db.collection('timeline').add({
+    kegiatan, tanggal: new Date(tanggal), waktu, divisi,
+    createdBy: currentProfile.nama,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(()=>{ toast('Agenda ditambahkan.'); closeModal(); });
+}
+function deleteJadwal(id){
+  if(!confirm('Hapus agenda ini?')) return;
+  db.collection('timeline').doc(id).delete().then(()=> toast('Agenda dihapus.'));
+}
+
+/* ============================================================
+   DOKUMEN
+   ============================================================ */
+function renderDokumen(){
+  const grid = document.getElementById('dokumenGrid');
+  grid.innerHTML = cache.documents.map(doc => `
+    <div class="card" style="padding:16px;">
+      <div class="font-mono" style="font-size:10.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.05em;">${ROLE_LABELS[doc.divisi]||'Umum'} · ${fmtDate(doc.createdAt)}</div>
+      <div style="font-size:14px; font-weight:600; margin:6px 0 10px;">${escapeHtml(doc.nama)}</div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <a href="${doc.url}" target="_blank" rel="noopener" class="btn btn-outline btn-sm" style="text-decoration:none; display:inline-block;">Buka</a>
+        ${(isBPH() || doc.uploadedBy===currentProfile.nama) ? `<button class="btn btn-danger btn-sm" onclick="deleteDokumen('${doc.id}','${(doc.storagePath||'').replace(/'/g,"")}')">Hapus</button>` : ''}
+      </div>
+    </div>`).join('') || '<p style="color:var(--ink-soft);">Belum ada dokumen.</p>';
+}
+function openDokumenModal(){
+  const divisiOptions = Object.keys(ROLE_LABELS).map(k => `<option value="${k}">${ROLE_LABELS[k]}</option>`).join('');
+  showModal(`
+    <h3 style="margin-top:0;">Unggah Dokumen</h3>
+    <div style="margin-bottom:12px;"><label>Nama Dokumen</label><input id="dNama" placeholder="cth. Proposal Kegiatan"></div>
+    <div style="margin-bottom:12px;"><label>Divisi</label><select id="dDivisi"><option value="umum">Umum</option>${divisiOptions}</select></div>
+    <div style="margin-bottom:16px;"><label>File</label><input type="file" id="dFile"></div>
+    <p id="uploadProgress" style="font-size:12px; color:var(--ink-soft);"></p>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+      <button class="btn" id="btnUploadDoc" onclick="saveDokumen()">Unggah</button>
+    </div>`);
+}
+function saveDokumen(){
+  const nama = document.getElementById('dNama').value.trim();
+  const divisi = document.getElementById('dDivisi').value;
+  const file = document.getElementById('dFile').files[0];
+  if(!nama || !file){ toast('Lengkapi nama dan pilih file.'); return; }
+  const btn = document.getElementById('btnUploadDoc');
+  btn.disabled = true; btn.textContent = 'Mengunggah...';
+  const path = `dokumen/${Date.now()}_${file.name}`;
+  const ref = storage.ref().child(path);
+  const task = ref.put(file);
+  task.on('state_changed', snap => {
+    const pct = Math.round((snap.bytesTransferred/snap.totalBytes)*100);
+    document.getElementById('uploadProgress').textContent = `Mengunggah... ${pct}%`;
+  }, err => {
+    toast('Gagal mengunggah: ' + err.message);
+    btn.disabled = false; btn.textContent = 'Unggah';
+  }, () => {
+    task.snapshot.ref.getDownloadURL().then(url => {
+      db.collection('documents').add({
+        nama, divisi, url, storagePath: path,
+        uploadedBy: currentProfile.nama,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(()=>{ toast('Dokumen diunggah.'); closeModal(); });
     });
-    container.innerHTML = html;
+  });
+}
+function deleteDokumen(id, storagePath){
+  if(!confirm('Hapus dokumen ini?')) return;
+  db.collection('documents').doc(id).delete().then(()=>{
+    if(storagePath){ storage.ref().child(storagePath).delete().catch(()=>{}); }
+    toast('Dokumen dihapus.');
+  });
 }
 
-function goHome() {
-    showHome();
+/* ============================================================
+   MODAL HELPERS
+   ============================================================ */
+function showModal(innerHtml){
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+      <div class="modal">${innerHtml}</div>
+    </div>`;
 }
-
-function navigateTo(role) {
-    const allowed = getCurrentAllowedRoles();
-    if (!allowed.includes(role)) {
-        alert('Anda tidak memiliki akses ke halaman ini.');
-        return;
-    }
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById('page-home').classList.remove('active');
-    document.getElementById('page-dynamic').classList.add('active');
-
-    const titleMap = {
-        'ketua': '👤 Panel Ketua',
-        'bendahara': '💰 Panel Bendahara',
-        'sekretaris': '📝 Panel Sekretaris',
-        'acara': '🎉 Sie Acara',
-        'logistik': '📦 Sie Logistik',
-        'akademi': '📚 Sie Akademi',
-        'dekdok': '📸 Sie Dekdok',
-        'humas': '📢 Panel Humas',
-        'dpl': '👀 Dashboard DPL'
-    };
-    document.getElementById('dynamic-title').innerText = titleMap[role] || role;
-    renderPage(role);
-}
-
-// ================================================================
-// 8. RENDER PAGE (SEMUA ROLE DI SATU TEMPAT)
-// ================================================================
-function renderPage(role) {
-    const container = document.getElementById('dynamic-content');
-    if (role === 'ketua') renderKetua(container);
-    else if (role === 'bendahara') renderBendahara(container);
-    else if (role === 'sekretaris') renderSekretaris(container);
-    else if (DIVISIONS.includes(role)) renderSie(container, role);
-    else if (role === 'humas') renderHumas(container);
-    else if (role === 'dpl') renderDpl(container);
-    else container.innerHTML = '<p>Role tidak dikenal.</p>';
-}
-
-// ================================================================
-// 9. SIE (Acara, Logistik, Akademi, Dekdok)
-// ================================================================
-function renderSie(container, division) {
-    container.innerHTML = `
-        <div class="deadline-set" id="deadlineInfo-${division}">⏳ Memuat deadline...</div>
-        <h4>➕ Tambah Kegiatan</h4>
-        <div class="form-group"><label>Judul</label><input id="actTitle" placeholder="Nama kegiatan" /></div>
-        <div class="form-group"><label>Deskripsi</label><textarea id="actDesc" rows="2"></textarea></div>
-        <div class="form-group"><label>Foto</label><input type="file" id="actImage" accept="image/*" /></div>
-        <button class="btn-primary" onclick="submitActivity('${division}')">📤 Kirim</button>
-        <hr/><h4>📋 Daftar Kegiatan</h4>
-        <div id="activityList-${division}">Memuat...</div>
-    `;
-    loadDeadlineInfo(division);
-    loadActivities(division);
-}
-
-async function loadDeadlineInfo(division) {
-    const el = document.getElementById(`deadlineInfo-${division}`);
-    try {
-        const doc = await db.collection('deadlines').doc(division).get();
-        if (doc.exists) {
-            const d = doc.data().deadlineTime.toDate ? doc.data().deadlineTime.toDate() : new Date(doc.data().deadlineTime);
-            el.innerHTML = `⏰ Deadline: <strong>${d.toLocaleString('id-ID')}</strong>. Upload lewat waktu akan <span style="color:#b91c1c;">TERLAMBAT</span>.`;
-        } else {
-            el.innerHTML = '⚠️ Deadline belum diatur oleh Ketua.';
-        }
-    } catch (e) { el.innerHTML = 'Gagal load deadline.'; }
-}
-
-async function loadActivities(division) {
-    const el = document.getElementById(`activityList-${division}`);
-    try {
-        const snap = await db.collection('activities')
-            .where('division', '==', division)
-            .orderBy('timestamp', 'desc')
-            .get();
-        if (snap.empty) { el.innerHTML = 'Belum ada kegiatan.'; return; }
-        let html = '';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const ts = d.timestamp?.toDate?.() || new Date();
-            const status = d.isLate ? '<span class="late">⛔ TERLAMBAT</span>' : '<span class="ontime">✅ Tepat</span>';
-            html += `
-                <div class="item-card">
-                    ${d.imageUrl ? `<img src="${d.imageUrl}" />` : '<div style="width:80px;background:#e2e8f0;border-radius:8px;text-align:center;padding:30px 0;">📷</div>'}
-                    <div>
-                        <strong>${d.title}</strong><br/>
-                        <small>${d.desc || ''}</small><br/>
-                        <small>🕒 ${ts.toLocaleString('id-ID')}</small> ${status}
-                    </div>
-                </div>
-            `;
-        });
-        el.innerHTML = html;
-    } catch (e) { el.innerHTML = 'Error loading data.'; }
-}
-
-async function submitActivity(division) {
-    const title = document.getElementById('actTitle').value.trim();
-    const desc = document.getElementById('actDesc').value.trim();
-    const fileInput = document.getElementById('actImage');
-    if (!title) { alert('Judul wajib diisi!'); return; }
-
-    let isLate = false;
-    try {
-        const doc = await db.collection('deadlines').doc(division).get();
-        if (doc.exists) {
-            const deadline = doc.data().deadlineTime.toDate ? doc.data().deadlineTime.toDate() : new Date(doc.data().deadlineTime);
-            if (new Date() > deadline) isLate = true;
-        }
-    } catch (e) {}
-
-    let imageUrl = '';
-    if (fileInput.files.length > 0) {
-        const file = fileInput.files[0];
-        const path = `activities/${division}/${Date.now()}_${file.name}`;
-        const storageRef = storage.ref(path);
-        await storageRef.put(file);
-        imageUrl = await storageRef.getDownloadURL();
-    }
-
-    await db.collection('activities').add({
-        division: division,
-        title: title,
-        desc: desc,
-        imageUrl: imageUrl,
-        timestamp: new Date(),
-        isLate: isLate,
-        uid: currentUser.uid
-    });
-
-    await addPoints(currentUser.uid, 1);
-
-    alert('Kegiatan berhasil! ' + (isLate ? '⚠️ TERLAMBAT! Dievaluasi.' : '✅ Tepat waktu.') + ' Poin +1');
-    document.getElementById('actTitle').value = '';
-    document.getElementById('actDesc').value = '';
-    document.getElementById('actImage').value = '';
-    loadActivities(division);
-}
-
-// ================================================================
-// 10. BENDAHARA
-// ================================================================
-function renderBendahara(container) {
-    container.innerHTML = `
-        <div class="flex-row">
-            <div class="stat-box"><h4>💵 Total Pemasukan</h4><p id="totalIncome">Rp 0</p></div>
-            <div class="stat-box"><h4>💸 Total Pengeluaran</h4><p id="totalExpense">Rp 0</p></div>
-            <div class="stat-box"><h4>💰 Saldo</h4><p id="totalBalance">Rp 0</p></div>
-        </div>
-        <hr/>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;">
-            <span class="tab active" onclick="switchFinanceTab('income',this)">➕ Pemasukan</span>
-            <span class="tab" onclick="switchFinanceTab('expense',this)">➖ Pengeluaran + Nota</span>
-        </div>
-        <div id="financeForm">
-            <div class="form-group"><label>Deskripsi</label><input id="finDesc" placeholder="Keterangan" /></div>
-            <div class="form-group"><label>Jumlah (Rp)</label><input id="finAmount" type="number" placeholder="0" /></div>
-            <div id="receiptField" style="display:none;"><div class="form-group"><label>Foto Nota</label><input type="file" id="finReceipt" accept="image/*" /></div></div>
-            <button class="btn-primary" onclick="submitFinance('income')">Tambah Pemasukan</button>
-            <button class="btn-primary" onclick="submitFinance('expense')" style="background:#dc2626;">Tambah Pengeluaran</button>
-        </div>
-        <hr/><h4>📜 Riwayat Keuangan</h4>
-        <div id="financeList">Memuat...</div>
-    `;
-    loadFinances();
-}
-
-let currentFinanceType = 'income';
-function switchFinanceTab(type, el) {
-    currentFinanceType = type;
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById('receiptField').style.display = type === 'expense' ? 'block' : 'none';
-    const btns = document.querySelectorAll('#financeForm .btn-primary');
-    btns.forEach(b => b.style.display = 'none');
-    if (type === 'income') btns[0].style.display = 'inline-block';
-    else btns[1].style.display = 'inline-block';
-}
-
-async function submitFinance(type) {
-    const desc = document.getElementById('finDesc').value.trim();
-    const amount = parseInt(document.getElementById('finAmount').value);
-    if (!desc || isNaN(amount) || amount <= 0) { alert('Isi deskripsi dan jumlah dengan benar!'); return; }
-
-    let receiptUrl = '';
-    if (type === 'expense') {
-        const file = document.getElementById('finReceipt').files[0];
-        if (!file) { alert('Upload foto nota untuk pengeluaran!'); return; }
-        const path = `receipts/${Date.now()}_${file.name}`;
-        const storageRef = storage.ref(path);
-        await storageRef.put(file);
-        receiptUrl = await storageRef.getDownloadURL();
-    }
-
-    await db.collection('finances').add({
-        type: type,
-        desc: desc,
-        amount: amount,
-        receiptUrl: receiptUrl,
-        timestamp: new Date(),
-        uid: currentUser.uid
-    });
-
-    await addPoints(currentUser.uid, 1);
-
-    alert('Data keuangan berhasil! Poin +1');
-    document.getElementById('finDesc').value = '';
-    document.getElementById('finAmount').value = '';
-    document.getElementById('finReceipt').value = '';
-    loadFinances();
-}
-
-async function loadFinances() {
-    const snap = await db.collection('finances').orderBy('timestamp', 'desc').get();
-    let totalIncome = 0, totalExpense = 0;
-    let html = '';
-    snap.forEach(doc => {
-        const d = doc.data();
-        const ts = d.timestamp?.toDate?.() || new Date();
-        if (d.type === 'income') totalIncome += d.amount;
-        else totalExpense += d.amount;
-
-        html += `
-            <div class="item-card" style="border-left-color: ${d.type==='income'?'#22c55e':'#ef4444'};">
-                <div>
-                    <strong>${d.type === 'income' ? '📈' : '📉'} ${d.desc}</strong><br/>
-                    Rp ${d.amount.toLocaleString()} - ${d.type === 'income' ? 'Pemasukan' : 'Pengeluaran'}<br/>
-                    <small>${ts.toLocaleString('id-ID')}</small>
-                    ${d.receiptUrl ? `<br/><a href="${d.receiptUrl}" target="_blank">📎 Lihat Nota</a>` : ''}
-                </div>
-            </div>
-        `;
-    });
-    document.getElementById('totalIncome').innerText = `Rp ${totalIncome.toLocaleString()}`;
-    document.getElementById('totalExpense').innerText = `Rp ${totalExpense.toLocaleString()}`;
-    document.getElementById('totalBalance').innerText = `Rp ${(totalIncome - totalExpense).toLocaleString()}`;
-    document.getElementById('financeList').innerHTML = html || 'Belum ada transaksi.';
-}
-
-// ================================================================
-// 11. SEKRETARIS
-// ================================================================
-function renderSekretaris(container) {
-    container.innerHTML = `
-        <h4>📝 Input Logbook / Hasil Rapat</h4>
-        <div class="form-group"><label>Judul Rapat / Kegiatan</label><input id="meetingTitle" /></div>
-        <div class="form-group"><label>Kesimpulan / Hasil</label><textarea id="meetingSummary" rows="3"></textarea></div>
-        <button class="btn-primary" onclick="submitMeeting()">Simpan Logbook</button>
-        <hr/>
-        <h4>📖 Logbook Rapat</h4>
-        <div id="meetingList">Memuat...</div>
-        <hr/>
-        <h4>📋 REKAP SEMUA KEGIATAN SIE</h4>
-        <button class="btn-export" onclick="exportActivitiesToWord()">📄 Cetak ke Word</button>
-        <div id="sekretarisAllActivities">Memuat semua kegiatan...</div>
-    `;
-    loadMeetings();
-    loadAllActivitiesForSekretaris();
-}
-
-async function submitMeeting() {
-    const title = document.getElementById('meetingTitle').value.trim();
-    const summary = document.getElementById('meetingSummary').value.trim();
-    if (!title || !summary) { alert('Isi judul dan kesimpulan!'); return; }
-    await db.collection('meetings').add({
-        title: title,
-        summary: summary,
-        date: new Date(),
-        uid: currentUser.uid
-    });
-    await addPoints(currentUser.uid, 1);
-    alert('Logbook tersimpan! Poin +1');
-    document.getElementById('meetingTitle').value = '';
-    document.getElementById('meetingSummary').value = '';
-    loadMeetings();
-}
-
-async function loadMeetings() {
-    const snap = await db.collection('meetings').orderBy('date', 'desc').get();
-    let html = '';
-    snap.forEach(doc => {
-        const d = doc.data();
-        const ts = d.date?.toDate?.() || new Date();
-        html += `<div class="item-card"><strong>${d.title}</strong><br/>${d.summary}<br/><small>${ts.toLocaleString('id-ID')}</small></div>`;
-    });
-    document.getElementById('meetingList').innerHTML = html || 'Belum ada logbook.';
-}
-
-async function loadAllActivitiesForSekretaris() {
-    const el = document.getElementById('sekretarisAllActivities');
-    try {
-        const snap = await db.collection('activities').orderBy('timestamp', 'desc').get();
-        if (snap.empty) { el.innerHTML = 'Belum ada kegiatan dari sie manapun.'; return; }
-        let html = '';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const ts = d.timestamp?.toDate?.() || new Date();
-            const late = d.isLate ? '⚠️ TERLAMBAT' : '✅ Tepat';
-            html += `
-                <div class="item-card" style="border-left-color:#8b5cf6;">
-                    <div style="flex:1;">
-                        <strong>[${d.division.toUpperCase()}]</strong> ${d.title}<br/>
-                        ${d.desc || ''}<br/>
-                        <small>🕒 ${ts.toLocaleString('id-ID')} | ${late}</small>
-                        ${d.imageUrl ? `<br/><a href="${d.imageUrl}" target="_blank">📷 Lihat Foto</a>` : ''}
-                    </div>
-                    <button class="edit-btn" onclick="editActivity('${doc.id}')">✏️ Edit</button>
-                </div>
-            `;
-        });
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = 'Gagal memuat data.'; }
-}
-
-async function editActivity(docId) {
-    if (currentUserRole !== 'sekretaris' && currentUserRole !== 'superadmin') {
-        alert('Hanya Sekretaris yang bisa mengedit.');
-        return;
-    }
-    try {
-        const docRef = db.collection('activities').doc(docId);
-        const docSnap = await docRef.get();
-        if (!docSnap.exists) { alert('Data tidak ditemukan.'); return; }
-        const data = docSnap.data();
-        const newTitle = prompt('Edit Judul:', data.title);
-        if (newTitle === null) return;
-        const newDesc = prompt('Edit Deskripsi:', data.desc || '');
-        if (newDesc === null) return;
-        await docRef.update({
-            title: newTitle.trim(),
-            desc: newDesc.trim()
-        });
-        alert('✅ Kegiatan berhasil diperbarui!');
-        loadAllActivitiesForSekretaris();
-    } catch (e) {
-        alert('Gagal mengedit: ' + e.message);
-    }
-}
-
-// ================================================================
-// 12. KETUA
-// ================================================================
-function renderKetua(container) {
-    container.innerHTML = `
-        <h4>⏰ Atur Deadline per Sie</h4>
-        <div class="flex-row">
-            ${DIVISIONS.map(d => `
-                <div style="background:#f1f5f9;padding:15px;border-radius:12px;flex:1;min-width:150px;">
-                    <strong>${d.toUpperCase()}</strong>
-                    <input type="datetime-local" id="deadline_${d}" style="width:100%;margin:8px 0;padding:6px;" />
-                    <button class="btn-primary" style="padding:6px 12px;font-size:12px;" onclick="setDeadline('${d}')">Set</button>
-                    <div id="statusDeadline_${d}" style="font-size:12px;margin-top:4px;"></div>
-                </div>
-            `).join('')}
-        </div>
-        <hr/>
-        <div class="ketua-stat" id="ketuaStats">
-            <div class="stat"><div class="number" id="statActivities">0</div><div class="label">📋 Total Kegiatan</div></div>
-            <div class="stat"><div class="number" id="statIncome">Rp 0</div><div class="label">💰 Total Pemasukan</div></div>
-            <div class="stat"><div class="number" id="statExpense">Rp 0</div><div class="label">💸 Total Pengeluaran</div></div>
-            <div class="stat"><div class="number" id="statMeetings">0</div><div class="label">📝 Total Rapat</div></div>
-        </div>
-        <div style="background:#f1f5f9;padding:15px;border-radius:12px;margin-bottom:20px;">
-            <h4>🏆 LEADERBOARD (Poin Tertinggi)</h4>
-            <div id="leaderboardList">Memuat...</div>
-        </div>
-        <div style="background:#fef9c3;padding:15px;border-radius:12px;margin-bottom:20px;border:1px solid #facc15;">
-            <h4>🔑 DAFTAR PASSWORD ANGGOTA (Hanya Bisa Dilihat Ketua)</h4>
-            <div id="userPasswordList">Memuat...</div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;">
-            <span class="tab active" onclick="switchKetuaTab('activities',this)">📋 Kegiatan Sie</span>
-            <span class="tab" onclick="switchKetuaTab('finances',this)">💰 Keuangan</span>
-            <span class="tab" onclick="switchKetuaTab('meetings',this)">📝 Logbook Rapat</span>
-        </div>
-        <div id="ketuaTabContent">
-            <div id="ketuaTabActivities" class="tab-content active">Memuat kegiatan...</div>
-            <div id="ketuaTabFinances" class="tab-content">Memuat keuangan...</div>
-            <div id="ketuaTabMeetings" class="tab-content">Memuat logbook...</div>
-        </div>
-    `;
-    DIVISIONS.forEach(d => loadCurrentDeadline(d));
-    loadKetuaStats();
-    loadKetuaActivities();
-    loadKetuaFinances();
-    loadKetuaMeetings();
-    loadLeaderboard();
-    loadUserPasswords();
-}
-
-async function setDeadline(division) {
-    const val = document.getElementById(`deadline_${division}`).value;
-    if (!val) { alert('Pilih tanggal dan jam!'); return; }
-    const dateObj = new Date(val);
-    await db.collection('deadlines').doc(division).set({ deadlineTime: dateObj });
-    alert(`Deadline ${division} diset ke ${dateObj.toLocaleString('id-ID')}`);
-    loadCurrentDeadline(division);
-}
-
-async function loadCurrentDeadline(division) {
-    const el = document.getElementById(`statusDeadline_${division}`);
-    try {
-        const doc = await db.collection('deadlines').doc(division).get();
-        if (doc.exists) {
-            const d = doc.data().deadlineTime.toDate ? doc.data().deadlineTime.toDate() : new Date(doc.data().deadlineTime);
-            el.innerHTML = `🕒 ${d.toLocaleString('id-ID')}`;
-        } else el.innerHTML = 'Belum diatur';
-    } catch(e) { el.innerHTML = 'Error'; }
-}
-
-async function loadKetuaStats() {
-    try {
-        const actSnap = await db.collection('activities').get();
-        document.getElementById('statActivities').innerText = actSnap.size;
-        const finSnap = await db.collection('finances').get();
-        let totalIncome = 0, totalExpense = 0;
-        finSnap.forEach(doc => {
-            const d = doc.data();
-            if (d.type === 'income') totalIncome += d.amount;
-            else totalExpense += d.amount;
-        });
-        document.getElementById('statIncome').innerText = `Rp ${totalIncome.toLocaleString()}`;
-        document.getElementById('statExpense').innerText = `Rp ${totalExpense.toLocaleString()}`;
-        const meetSnap = await db.collection('meetings').get();
-        document.getElementById('statMeetings').innerText = meetSnap.size;
-    } catch(e) { console.error('Gagal load stats:', e); }
-}
-
-function switchKetuaTab(tab, el) {
-    document.querySelectorAll('#ketuaTabContent .tab-content').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('#ketuaTabContent .tab').forEach(t => t.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById(`ketuaTab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.add('active');
-}
-
-async function loadKetuaActivities() {
-    const el = document.getElementById('ketuaTabActivities');
-    try {
-        const snap = await db.collection('activities').orderBy('timestamp', 'desc').get();
-        if (snap.empty) { el.innerHTML = 'Belum ada kegiatan dari sie mana pun.'; return; }
-        let html = '';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const ts = d.timestamp?.toDate?.() || new Date();
-            const late = d.isLate ? '🔴 TERLAMBAT (Evaluasi)' : '🟢 Tepat Waktu';
-            html += `
-                <div class="item-card" style="border-left-color: ${d.isLate ? '#ef4444' : '#22c55e'};">
-                    <div>
-                        <strong>[${d.division.toUpperCase()}]</strong> ${d.title}<br/>
-                        ${d.desc || ''}<br/>
-                        <small>🕒 ${ts.toLocaleString('id-ID')} | ${late}</small>
-                        ${d.imageUrl ? `<br/><a href="${d.imageUrl}" target="_blank">📷 Lihat Foto</a>` : ''}
-                    </div>
-                </div>
-            `;
-        });
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = 'Gagal memuat kegiatan.'; }
-}
-
-async function loadKetuaFinances() {
-    const el = document.getElementById('ketuaTabFinances');
-    try {
-        const snap = await db.collection('finances').orderBy('timestamp', 'desc').get();
-        if (snap.empty) { el.innerHTML = 'Belum ada transaksi keuangan.'; return; }
-        let html = '';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const ts = d.timestamp?.toDate?.() || new Date();
-            const typeLabel = d.type === 'income' ? '📈 Pemasukan' : '📉 Pengeluaran';
-            const color = d.type === 'income' ? '#22c55e' : '#ef4444';
-            html += `
-                <div class="item-card" style="border-left-color: ${color};">
-                    <div>
-                        <strong>${typeLabel}</strong> ${d.desc}<br/>
-                        Rp ${d.amount.toLocaleString()}<br/>
-                        <small>${ts.toLocaleString('id-ID')}</small>
-                        ${d.receiptUrl ? `<br/><a href="${d.receiptUrl}" target="_blank">📎 Lihat Nota</a>` : ''}
-                    </div>
-                </div>
-            `;
-        });
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = 'Gagal memuat keuangan.'; }
-}
-
-async function loadKetuaMeetings() {
-    const el = document.getElementById('ketuaTabMeetings');
-    try {
-        const snap = await db.collection('meetings').orderBy('date', 'desc').get();
-        if (snap.empty) { el.innerHTML = 'Belum ada logbook rapat.'; return; }
-        let html = '';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const ts = d.date?.toDate?.() || new Date();
-            html += `
-                <div class="item-card" style="border-left-color: #8b5cf6;">
-                    <div>
-                        <strong>${d.title}</strong><br/>
-                        ${d.summary}<br/>
-                        <small>🕒 ${ts.toLocaleString('id-ID')}</small>
-                    </div>
-                </div>
-            `;
-        });
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = 'Gagal memuat logbook.'; }
-}
-
-async function loadLeaderboard() {
-    const el = document.getElementById('leaderboardList');
-    try {
-        const snap = await db.collection('users').orderBy('points', 'desc').get();
-        if (snap.empty) { el.innerHTML = 'Belum ada user terdaftar.'; return; }
-        let rank = 1;
-        let html = '';
-        snap.forEach(doc => {
-            const data = doc.data();
-            const email = data.email || 'unknown';
-            const role = data.role || 'member';
-            const points = data.points || 0;
-            if (role !== 'member' && role !== 'superadmin') {
-                html += `
-                    <div class="leaderboard-item">
-                        <span class="rank">#${rank}</span>
-                        <span class="name">${email} <small>(${role})</small></span>
-                        <span class="pts">⭐ ${points} poin</span>
-                    </div>
-                `;
-                rank++;
-            }
-        });
-        if (!html) html = 'Belum ada user dengan peran aktif.';
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = 'Gagal memuat leaderboard.'; }
-}
-
-async function loadUserPasswords() {
-    const el = document.getElementById('userPasswordList');
-    try {
-        const snap = await db.collection('users').get();
-        if (snap.empty) { el.innerHTML = 'Belum ada user terdaftar.'; return; }
-        let html = `
-            <table class="user-password-table">
-                <thead>
-                    <tr><th>Email</th><th>Role</th><th>Password</th><th>Aksi</th></tr>
-                </thead>
-                <tbody>
-        `;
-        snap.forEach(doc => {
-            const data = doc.data();
-            const email = data.email || 'unknown';
-            const role = data.role || 'member';
-            let decrypted = 'Tidak tersimpan';
-            if (data.passwordEncrypted) {
-                try {
-                    decrypted = decryptPassword(data.passwordEncrypted);
-                } catch(e) { decrypted = '❌ Error'; }
-            }
-            html += `
-                <tr>
-                    <td>${email}</td>
-                    <td>${role}</td>
-                    <td><strong>${decrypted}</strong></td>
-                    <td><button class="btn-reset" onclick="resetUserPassword('${doc.id}')">🔄 Reset</button></td>
-                </tr>
-            `;
-        });
-        html += '</tbody></table>';
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = 'Gagal memuat daftar password.'; }
-}
-
-async function resetUserPassword(uid) {
-    if (!confirm('Yakin akan mereset password user ini?')) return;
-    try {
-        const userDoc = await db.collection('users').doc(uid).get();
-        const email = userDoc.data().email;
-        await auth.sendPasswordResetEmail(email);
-        alert(`✅ Email reset telah dikirim ke ${email}`);
-    } catch (e) {
-        alert('Gagal reset password: ' + e.message);
-    }
-}
-
-// ================================================================
-// 13. HUMAS
-// ================================================================
-function renderHumas(container) {
-    container.innerHTML = `
-        <h4>📢 Dokumentasi Humas</h4>
-        <div class="form-group"><label>Judul Dokumentasi</label><input id="humasTitle" placeholder="Judul" /></div>
-        <div class="form-group"><label>Deskripsi</label><textarea id="humasDesc" rows="2"></textarea></div>
-        <div class="form-group"><label>Foto</label><input type="file" id="humasImage" accept="image/*" /></div>
-        <button class="btn-primary" onclick="submitHumasActivity()">📤 Upload Dokumentasi</button>
-        <hr/>
-        <h4>📸 Galeri Dokumentasi (Semua Kegiatan)</h4>
-        <div id="humasAllActivities">Memuat semua kegiatan...</div>
-    `;
-    loadHumasAllActivities();
-}
-
-async function submitHumasActivity() {
-    const title = document.getElementById('humasTitle').value.trim();
-    const desc = document.getElementById('humasDesc').value.trim();
-    const fileInput = document.getElementById('humasImage');
-    if (!title) { alert('Judul wajib diisi!'); return; }
-    let imageUrl = '';
-    if (fileInput.files.length > 0) {
-        const file = fileInput.files[0];
-        const path = `activities/humas/${Date.now()}_${file.name}`;
-        const storageRef = storage.ref(path);
-        await storageRef.put(file);
-        imageUrl = await storageRef.getDownloadURL();
-    }
-    await db.collection('activities').add({
-        division: 'humas',
-        title: title,
-        desc: desc,
-        imageUrl: imageUrl,
-        timestamp: new Date(),
-        isLate: false,
-        uid: currentUser.uid
-    });
-    await addPoints(currentUser.uid, 1);
-    alert('Dokumentasi berhasil! Poin +1');
-    document.getElementById('humasTitle').value = '';
-    document.getElementById('humasDesc').value = '';
-    document.getElementById('humasImage').value = '';
-    loadHumasAllActivities();
-}
-
-async function loadHumasAllActivities() {
-    const el = document.getElementById('humasAllActivities');
-    try {
-        const snap = await db.collection('activities').orderBy('timestamp', 'desc').get();
-        if (snap.empty) { el.innerHTML = 'Belum ada kegiatan.'; return; }
-        let html = '';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const ts = d.timestamp?.toDate?.() || new Date();
-            html += `
-                <div class="item-card" style="border-left-color: #f59e0b;">
-                    <div>
-                        <strong>[${d.division.toUpperCase()}]</strong> ${d.title}<br/>
-                        ${d.desc || ''}<br/>
-                        <small>🕒 ${ts.toLocaleString('id-ID')}</small>
-                        ${d.imageUrl ? `<br/><a href="${d.imageUrl}" target="_blank">📷 Lihat Foto</a>` : ''}
-                    </div>
-                </div>
-            `;
-        });
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = 'Gagal memuat data.'; }
-}
-
-// ================================================================
-// 14. DPL (Monitoring)
-// ================================================================
-function renderDpl(container) {
-    container.innerHTML = `
-        <div class="ketua-stat" id="dplStats">
-            <div class="stat"><div class="number" id="dplTotalUser">0</div><div class="label">👤 Total User</div></div>
-            <div class="stat"><div class="number" id="dplTotalAct">0</div><div class="label">📋 Total Kegiatan</div></div>
-            <div class="stat"><div class="number" id="dplTotalFin">Rp 0</div><div class="label">💰 Total Keuangan</div></div>
-            <div class="stat"><div class="number" id="dplTotalMeet">0</div><div class="label">📝 Total Rapat</div></div>
-        </div>
-        <div class="dpl-grid">
-            <div>
-                <h4>🕒 Log Login Terbaru</h4>
-                <div id="dplLoginLogs">Memuat...</div>
-            </div>
-            <div>
-                <h4>📋 Kegiatan Terbaru</h4>
-                <div id="dplRecentActivities">Memuat...</div>
-            </div>
-            <div>
-                <h4>💰 Keuangan Terbaru</h4>
-                <div id="dplFinances">Memuat...</div>
-            </div>
-            <div>
-                <h4>📝 Logbook Rapat</h4>
-                <div id="dplMeetings">Memuat...</div>
-            </div>
-        </div>
-    `;
-    loadDplStats();
-    loadDplLoginLogs();
-    loadDplRecentActivities();
-    loadDplFinances();
-    loadDplMeetings();
-}
-
-async function loadDplStats() {
-    try {
-        const userSnap = await db.collection('users').get();
-        document.getElementById('dplTotalUser').innerText = userSnap.size;
-        const actSnap = await db.collection('activities').get();
-        document.getElementById('dplTotalAct').innerText = actSnap.size;
-        const finSnap = await db.collection('finances').get();
-        let total = 0;
-        finSnap.forEach(doc => { total += doc.data().amount || 0; });
-        document.getElementById('dplTotalFin').innerText = `Rp ${total.toLocaleString()}`;
-        const meetSnap = await db.collection('meetings').get();
-        document.getElementById('dplTotalMeet').innerText = meetSnap.size;
-    } catch(e) { console.error(e); }
-}
-
-async function loadDplLoginLogs() {
-    const el = document.getElementById('dplLoginLogs');
-    try {
-        const snap = await db.collection('login_logs').orderBy('timestamp', 'desc').limit(20).get();
-        if (snap.empty) { el.innerHTML = 'Belum ada log login.'; return; }
-        let html = '';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const ts = d.timestamp?.toDate?.() || new Date();
-            html += `<div class="log-entry"><span>${d.email || 'unknown'}</span><span>${ts.toLocaleString('id-ID')}</span></div>`;
-        });
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = 'Gagal memuat log.'; }
-}
-
-async function loadDplRecentActivities() {
-    const el = document.getElementById('dplRecentActivities');
-    try {
-        const snap = await db.collection('activities').orderBy('timestamp', 'desc').limit(10).get();
-        if (snap.empty) { el.innerHTML = 'Belum ada kegiatan.'; return; }
-        let html = '';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const ts = d.timestamp?.toDate?.() || new Date();
-            html += `<div class="item-card" style="border-left-color:#2563eb; padding:8px 12px;"><div><strong>[${d.division}]</strong> ${d.title}<br/><small>${ts.toLocaleString('id-ID')}</small></div></div>`;
-        });
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = 'Gagal.'; }
-}
-
-async function loadDplFinances() {
-    const el = document.getElementById('dplFinances');
-    try {
-        const snap = await db.collection('finances').orderBy('timestamp', 'desc').limit(10).get();
-        if (snap.empty) { el.innerHTML = 'Belum ada transaksi.'; return; }
-        let html = '';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const ts = d.timestamp?.toDate?.() || new Date();
-            const color = d.type === 'income' ? '#22c55e' : '#ef4444';
-            html += `<div class="item-card" style="border-left-color:${color}; padding:8px 12px;"><div><strong>${d.type === 'income' ? '📈' : '📉'}</strong> ${d.desc} - Rp ${d.amount.toLocaleString()}<br/><small>${ts.toLocaleString('id-ID')}</small></div></div>`;
-        });
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = 'Gagal.'; }
-}
-
-async function loadDplMeetings() {
-    const el = document.getElementById('dplMeetings');
-    try {
-        const snap = await db.collection('meetings').orderBy('date', 'desc').limit(10).get();
-        if (snap.empty) { el.innerHTML = 'Belum ada logbook.'; return; }
-        let html = '';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const ts = d.date?.toDate?.() || new Date();
-            html += `<div class="item-card" style="border-left-color:#8b5cf6; padding:8px 12px;"><div><strong>${d.title}</strong><br/><small>${ts.toLocaleString('id-ID')}</small></div></div>`;
-        });
-        el.innerHTML = html;
-    } catch(e) { el.innerHTML = 'Gagal.'; }
-}
-
-// ================================================================
-// 15. EKSPOS FUNGSI KE WINDOW (AGAR BISA DIPANGGIL DARI HTML)
-// ================================================================
-window.login = login;
-window.register = register;
-window.logout = logout;
-window.toggleAuth = toggleAuth;
-window.resetPassword = resetPassword;
-window.goHome = goHome;
-window.navigateTo = navigateTo;
-window.submitActivity = submitActivity;
-window.submitFinance = submitFinance;
-window.switchFinanceTab = switchFinanceTab;
-window.submitMeeting = submitMeeting;
-window.editActivity = editActivity;
-window.exportActivitiesToWord = exportActivitiesToWord;
-window.setDeadline = setDeadline;
-window.switchKetuaTab = switchKetuaTab;
-window.resetUserPassword = resetUserPassword;
-window.submitHumasActivity = submitHumasActivity;
-
-console.log('🚀 Aplikasi siap!');
-console.log('🔑 Akun bawaan: ketua@panitia.com / rahasia123');
-console.log('👑 Super Admin: admin@panitia.com / admin123');
+function closeModal(){ document.getElementById('modalRoot').innerHTML = ''; }
 </script>
 </body>
 </html>
