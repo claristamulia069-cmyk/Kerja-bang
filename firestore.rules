@@ -8,16 +8,34 @@ service cloud.firestore {
     function myRole() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
+    function isSuper() {
+      return isSignedIn() && myRole() == 'super';
+    }
     function isBPH() {
-      return isSignedIn() && myRole() == 'bph';
+      return isSignedIn() && (myRole() == 'bph' || myRole() == 'super');
     }
 
-    // Profil anggota
+    // Profil anggota — akun bersifat tetap ("paten"):
+    // - Pemilik akun HANYA boleh mengubah field `sandiDiganti` dan `jabatan` miliknya sendiri,
+    //   tidak boleh mengubah `role` (divisi) atau `nama` miliknya sendiri.
+    // - Hanya Super Admin yang boleh mengubah role/divisi anggota lain atau menghapus akun.
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isSignedIn() && (request.auth.uid == userId || isBPH());
-      allow delete: if isBPH();
+
+      // Pembuatan akun Super pertama (self, lewat form Setup) atau oleh Super untuk orang lain.
+      allow create: if isSignedIn() && (
+                        (request.auth.uid == userId && request.resource.data.role == 'super')
+                        || isSuper()
+                      );
+
+      allow update: if isSignedIn() && (
+                        isSuper()
+                        || (request.auth.uid == userId
+                            && request.resource.data.role == resource.data.role
+                            && request.resource.data.nama == resource.data.nama)
+                      );
+
+      allow delete: if isSuper();
     }
 
     // Tugas per divisi
