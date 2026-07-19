@@ -313,39 +313,38 @@ td{
         <button class="btn" style="width:100%;" onclick="doLogin()">Masuk</button>
         <p id="loginError" style="color:var(--brick); font-size:12.5px; margin-top:10px;"></p>
         <p style="text-align:center; font-size:12.5px; margin-top:16px; color:var(--ink-soft);">
-          Belum punya akun? <a href="#" onclick="toggleAuthForm(event)" style="color:var(--forest); font-weight:600;">Daftar di sini</a>
+          Akun dibuatkan oleh Super Admin. <a href="#" onclick="toggleAuthForm(event)" style="color:var(--forest); font-weight:600;">Setup Super Admin</a>
         </p>
       </div>
 
-      <!-- REGISTER FORM -->
+      <!-- SETUP SUPER ADMIN (hanya untuk pemasangan awal, digerbang kode) -->
       <div id="registerForm" class="hidden">
+        <p style="font-size:12px; color:var(--ink-soft); margin-top:0;">
+          Form ini hanya untuk membuat <strong>satu akun Super Admin</strong> saat pertama kali
+          memasang sistem. Setelah itu, Super Admin membuat akun anggota lain lewat menu Anggota
+          di dalam aplikasi. Butuh Kode Setup — lihat README.md.
+        </p>
+        <div style="margin-bottom:14px;">
+          <label>Kode Setup</label>
+          <input type="text" id="regSetupCode" placeholder="Kode rahasia dari README">
+        </div>
         <div style="margin-bottom:14px;">
           <label>Nama Lengkap</label>
           <input type="text" id="regNama" placeholder="Nama sesuai KTP">
         </div>
         <div style="margin-bottom:14px;">
           <label>Email</label>
-          <input type="email" id="regEmail" placeholder="nama@kelompok.id" autocomplete="username">
+          <input type="email" id="regEmail" placeholder="admin@kelompok.id" autocomplete="username">
         </div>
         <div style="margin-bottom:14px;">
           <label>Kata Sandi</label>
           <input type="password" id="regPassword" placeholder="Minimal 6 karakter" autocomplete="new-password">
         </div>
-        <div style="margin-bottom:14px;">
-          <label>Divisi / Seksi</label>
-          <select id="regRole">
-            <option value="bph">BPH (Badan Pengurus Harian)</option>
-            <option value="akademi">Sie Akademi</option>
-            <option value="humas">Sie Humas</option>
-            <option value="pdd">Sie PDD</option>
-            <option value="acara">Sie Acara</option>
-          </select>
-        </div>
         <div style="margin-bottom:16px;">
           <label>Jabatan (opsional)</label>
           <input type="text" id="regJabatan" placeholder="cth. Koordinator, Anggota">
         </div>
-        <button class="btn" style="width:100%;" onclick="doRegister()">Daftar</button>
+        <button class="btn" style="width:100%;" onclick="doRegister()">Buat Akun Super Admin</button>
         <p id="registerError" style="color:var(--brick); font-size:12.5px; margin-top:10px;"></p>
         <p style="text-align:center; font-size:12.5px; margin-top:16px; color:var(--ink-soft);">
           Sudah punya akun? <a href="#" onclick="toggleAuthForm(event)" style="color:var(--forest); font-weight:600;">Masuk</a>
@@ -375,6 +374,7 @@ td{
     <div class="sidebar-user">
       <div class="name" id="sbUserName">-</div>
       <div class="role-badge" id="sbUserRole">-</div>
+      <div class="logout-btn" id="gantiSandiBtn" onclick="openGantiSandiModal()" style="margin-top:8px;">Ganti Sandi</div>
       <div class="logout-btn" onclick="doLogout()">Keluar</div>
     </div>
   </nav>
@@ -408,10 +408,16 @@ td{
 
     <!-- ANGGOTA -->
     <section id="sec-anggota" class="hidden">
-      <div class="letterhead">
-        <div class="eyebrow">Data Kepanitiaan</div>
-        <h1>Anggota &amp; Divisi</h1>
+      <div class="letterhead" style="display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div class="eyebrow">Data Kepanitiaan</div>
+          <h1>Anggota &amp; Divisi</h1>
+        </div>
+        <button class="btn hidden" id="btnTambahAnggota" onclick="openTambahAnggotaModal()">+ Tambah Anggota</button>
       </div>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-4px;">
+        Akun bersifat tetap — divisi hanya dapat diubah oleh Super Admin.
+      </p>
       <div id="anggotaTableWrap" class="card" style="padding:6px 18px; overflow-x:auto;">
         <table>
           <thead><tr><th>Nama</th><th>Divisi</th><th>Jabatan</th><th>Email</th><th></th></tr></thead>
@@ -514,7 +520,19 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 const storage = firebase.storage();
 
-const ROLE_LABELS = { bph:'BPH', akademi:'Sie Akademi', humas:'Sie Humas', pdd:'Sie PDD', acara:'Sie Acara' };
+/* App kedua khusus untuk membuat akun anggota lain tanpa mengganggu
+   sesi login Super Admin yang sedang aktif (Firebase client SDK otomatis
+   login sebagai user yang baru dibuat, jadi kita pakai instance terpisah). */
+const secondaryApp = firebase.initializeApp(firebaseConfig, "secondary");
+const secondaryAuth = secondaryApp.auth();
+
+/* GANTI kode ini sebelum deploy final. Dipakai satu kali untuk membuat
+   akun Super Admin pertama lewat form "Setup Super Admin" di halaman login.
+   Setelah akun Super Admin dibuat, sebaiknya ganti nilai ini lagi (atau
+   hapus form setup) supaya orang lain tidak bisa membuat akun Super baru. */
+const SUPER_SETUP_CODE = "KKN-SUPER-2026";
+
+const ROLE_LABELS = { super:'Super Admin', bph:'BPH', akademi:'Sie Akademi', humas:'Sie Humas', pdd:'Sie PDD', acara:'Sie Acara' };
 
 let currentUser = null;   // firebase auth user
 let currentProfile = null; // firestore users/{uid} doc
@@ -539,7 +557,8 @@ function fmtDate(d){
   const dt = (d.toDate) ? d.toDate() : new Date(d);
   return dt.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
 }
-function isBPH(){ return currentProfile && currentProfile.role === 'bph'; }
+function isBPH(){ return currentProfile && (currentProfile.role === 'bph' || currentProfile.role === 'super'); }
+function isSuper(){ return currentProfile && currentProfile.role === 'super'; }
 function canManage(divisi){ return isBPH() || (currentProfile && currentProfile.role === divisi); }
 
 /* ---------------- AUTH ---------------- */
@@ -550,14 +569,18 @@ function toggleAuthForm(e){
 }
 
 function doRegister(){
+  const code = document.getElementById('regSetupCode').value.trim();
   const nama = document.getElementById('regNama').value.trim();
   const email = document.getElementById('regEmail').value.trim();
   const password = document.getElementById('regPassword').value;
-  const role = document.getElementById('regRole').value;
   const jabatan = document.getElementById('regJabatan').value.trim();
   const errEl = document.getElementById('registerError');
   errEl.textContent = '';
 
+  if(code !== SUPER_SETUP_CODE){
+    errEl.textContent = 'Kode setup salah.';
+    return;
+  }
   if(!nama || !email || password.length < 6){
     errEl.textContent = 'Lengkapi semua data. Kata sandi minimal 6 karakter.';
     return;
@@ -566,11 +589,26 @@ function doRegister(){
   auth.createUserWithEmailAndPassword(email, password)
     .then(cred => {
       return db.collection('users').doc(cred.user.uid).set({
-        nama, email, role, jabatan: jabatan || '',
+        nama, email, role: 'super', jabatan: jabatan || 'Super Admin',
+        sandiDiganti: false,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     })
     .catch(err => { errEl.textContent = translateAuthError(err); });
+}
+
+/* Super Admin membuat akun anggota lain (BPH / sie) memakai instance
+   Firebase kedua, supaya sesi Super Admin yang sedang login tidak ikut
+   tergantikan oleh akun baru yang dibuat. */
+function tambahAnggota(nama, email, password, role, jabatan){
+  return secondaryAuth.createUserWithEmailAndPassword(email, password)
+    .then(cred => {
+      return db.collection('users').doc(cred.user.uid).set({
+        nama, email, role, jabatan: jabatan || '',
+        sandiDiganti: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(() => secondaryAuth.signOut());
+    });
 }
 
 function doLogin(){
@@ -612,6 +650,7 @@ auth.onAuthStateChanged(user => {
       document.getElementById('appScreen').classList.remove('hidden');
       document.getElementById('sbUserName').textContent = currentProfile.nama;
       document.getElementById('sbUserRole').textContent = ROLE_LABELS[currentProfile.role] || currentProfile.role;
+      document.getElementById('btnTambahAnggota').classList.toggle('hidden', !isSuper());
       document.getElementById('todayDate').textContent = new Date().toLocaleDateString('id-ID',{ weekday:'long', day:'2-digit', month:'long', year:'numeric' });
       attachListeners();
     });
@@ -694,14 +733,14 @@ function renderAnggota(){
       <td>${ROLE_LABELS[u.role]||u.role}</td>
       <td>${escapeHtml(u.jabatan||'-')}</td>
       <td class="font-mono" style="font-size:12px;">${escapeHtml(u.email)}</td>
-      <td>${isBPH() ? `<button class="btn btn-outline btn-sm" onclick="editAnggotaRole('${u.id}')">Ubah Divisi</button>` : ''}</td>
+      <td>${isSuper() && u.role !== 'super' ? `<button class="btn btn-outline btn-sm" onclick="editAnggotaRole('${u.id}')">Ubah Divisi</button>` : ''}</td>
     </tr>`).join('') || `<tr><td colspan="5" style="color:var(--ink-soft);">Belum ada anggota.</td></tr>`;
 }
 
 function editAnggotaRole(uid){
   const u = cache.users.find(x=>x.id===uid);
   if(!u) return;
-  const options = Object.keys(ROLE_LABELS).map(k => `<option value="${k}" ${u.role===k?'selected':''}>${ROLE_LABELS[k]}</option>`).join('');
+  const options = Object.keys(ROLE_LABELS).filter(k=>k!=='super').map(k => `<option value="${k}" ${u.role===k?'selected':''}>${ROLE_LABELS[k]}</option>`).join('');
   showModal(`
     <h3 style="margin-top:0;">Ubah Divisi — ${escapeHtml(u.nama)}</h3>
     <div style="margin-bottom:14px;"><label>Divisi</label><select id="editRoleSelect">${options}</select></div>
@@ -715,6 +754,85 @@ function saveAnggotaRole(uid){
   const role = document.getElementById('editRoleSelect').value;
   const jabatan = document.getElementById('editJabatanInput').value.trim();
   db.collection('users').doc(uid).update({ role, jabatan }).then(()=>{ toast('Divisi diperbarui.'); closeModal(); });
+}
+
+function openTambahAnggotaModal(){
+  const divisiOptions = Object.keys(ROLE_LABELS).filter(k=>k!=='super').map(k => `<option value="${k}">${ROLE_LABELS[k]}</option>`).join('');
+  showModal(`
+    <h3 style="margin-top:0;">Tambah Anggota Baru</h3>
+    <p style="font-size:12px; color:var(--ink-soft); margin-top:0;">
+      Akun langsung aktif dengan sandi di bawah. Sandi hanya bisa diganti
+      satu kali oleh anggota tersebut setelah login pertama.
+    </p>
+    <div style="margin-bottom:12px;"><label>Nama Lengkap</label><input id="taNama"></div>
+    <div style="margin-bottom:12px;"><label>Email</label><input type="email" id="taEmail"></div>
+    <div style="margin-bottom:12px;"><label>Sandi Awal</label><input id="taPassword" placeholder="Minimal 6 karakter"></div>
+    <div style="margin-bottom:12px;"><label>Divisi</label><select id="taDivisi">${divisiOptions}</select></div>
+    <div style="margin-bottom:16px;"><label>Jabatan (opsional)</label><input id="taJabatan"></div>
+    <p id="taError" style="color:var(--brick); font-size:12.5px;"></p>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+      <button class="btn" id="btnSimpanAnggota" onclick="submitTambahAnggota()">Buat Akun</button>
+    </div>`);
+}
+function submitTambahAnggota(){
+  const nama = document.getElementById('taNama').value.trim();
+  const email = document.getElementById('taEmail').value.trim();
+  const password = document.getElementById('taPassword').value;
+  const role = document.getElementById('taDivisi').value;
+  const jabatan = document.getElementById('taJabatan').value.trim();
+  const errEl = document.getElementById('taError');
+  errEl.textContent = '';
+  if(!nama || !email || password.length < 6){
+    errEl.textContent = 'Lengkapi semua data. Sandi minimal 6 karakter.';
+    return;
+  }
+  const btn = document.getElementById('btnSimpanAnggota');
+  btn.disabled = true; btn.textContent = 'Membuat...';
+  tambahAnggota(nama, email, password, role, jabatan)
+    .then(()=>{ toast(`Akun ${nama} dibuat. Sandi awal: ${password}`); closeModal(); })
+    .catch(err => { errEl.textContent = translateAuthError(err); btn.disabled = false; btn.textContent = 'Buat Akun'; });
+}
+
+/* ---------------- GANTI SANDI (hanya sekali) ---------------- */
+function openGantiSandiModal(){
+  if(currentProfile.sandiDiganti){
+    showModal(`
+      <h3 style="margin-top:0;">Ganti Sandi</h3>
+      <p style="font-size:13px; color:var(--ink-soft);">
+        Sandi akun ini sudah pernah diganti sebelumnya. Untuk menjaga
+        keamanan, setiap akun hanya bisa mengganti sandi satu kali.
+        Hubungi Super Admin jika lupa sandi.
+      </p>
+      <div style="text-align:right;"><button class="btn btn-outline" onclick="closeModal()">Tutup</button></div>`);
+    return;
+  }
+  showModal(`
+    <h3 style="margin-top:0;">Ganti Sandi</h3>
+    <p style="font-size:12px; color:var(--ink-soft); margin-top:0;">
+      Perhatian: sandi hanya bisa diganti <strong>satu kali</strong>. Pastikan
+      sandi baru mudah diingat.
+    </p>
+    <div style="margin-bottom:12px;"><label>Sandi Saat Ini</label><input type="password" id="gsLama"></div>
+    <div style="margin-bottom:12px;"><label>Sandi Baru</label><input type="password" id="gsBaru" placeholder="Minimal 6 karakter"></div>
+    <p id="gsError" style="color:var(--brick); font-size:12.5px;"></p>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+      <button class="btn" onclick="submitGantiSandi()">Simpan</button>
+    </div>`);
+}
+function submitGantiSandi(){
+  const lama = document.getElementById('gsLama').value;
+  const baru = document.getElementById('gsBaru').value;
+  const errEl = document.getElementById('gsError');
+  errEl.textContent = '';
+  if(baru.length < 6){ errEl.textContent = 'Sandi baru minimal 6 karakter.'; return; }
+  const cred = firebase.auth.EmailAuthProvider.credential(currentUser.email, lama);
+  currentUser.reauthenticateWithCredential(cred)
+    .then(() => currentUser.updatePassword(baru))
+    .then(() => db.collection('users').doc(currentUser.uid).update({ sandiDiganti: true }))
+    .then(() => { currentProfile.sandiDiganti = true; toast('Sandi berhasil diganti.'); closeModal(); })
+    .catch(err => { errEl.textContent = translateAuthError(err); });
 }
 
 /* ============================================================
