@@ -406,8 +406,11 @@ td{
       </div>
 
       <div class="card" style="padding:18px;">
-        <h3 style="margin:0 0 4px; font-size:15px;">Papan Poin Kontribusi</h3>
-        <p style="font-size:11.5px; color:var(--ink-soft); margin:0 0 12px;">1 poin per tugas yang ditandai selesai oleh anggota tsb.</p>
+        <h3 style="margin:0 0 4px; font-size:15px;">Poin Kontribusi Anggota</h3>
+        <p style="font-size:12px; color:var(--ink-soft); margin:0 0 12px;">
+          Dihitung dari jumlah tugas yang ditandai <strong>Selesai</strong> oleh masing-masing orang —
+          bukan cuma per divisi, biar kelihatan siapa yang benar-benar mengerjakan.
+        </p>
         <div id="dashLeaderboard" style="font-size:13px;"></div>
       </div>
     </section>
@@ -540,7 +543,7 @@ const secondaryAuth = secondaryApp.auth();
    hapus form setup) supaya orang lain tidak bisa membuat akun Super baru. */
 const SUPER_SETUP_CODE = "KKN-SUPER-2026";
 
-const ROLE_LABELS = { super:'Super Admin', bph:'BPH', sekretaris:'Sekretaris', bendahara:'Bendahara', akademi:'Sie Akademi', humas:'Sie Humas', pdd:'Sie PDD', acara:'Sie Acara' };
+const ROLE_LABELS = { super:'Super Admin', bph:'BPH (Ketua/Wakil)', sekretaris:'Sekretaris', bendahara:'Bendahara', akademi:'Sie Akademi', humas:'Sie Humas', pdd:'Sie PDD', acara:'Sie Acara' };
 
 let currentUser = null;   // firebase auth user
 let currentProfile = null; // firestore users/{uid} doc
@@ -568,6 +571,7 @@ function fmtDate(d){
 function isBPH(){ return currentProfile && (currentProfile.role === 'bph' || currentProfile.role === 'super'); }
 function isSuper(){ return currentProfile && currentProfile.role === 'super'; }
 function canManage(divisi){ return isBPH() || (currentProfile && currentProfile.role === divisi); }
+function canManageKeuangan(){ return isBPH() || (currentProfile && currentProfile.role === 'bendahara'); }
 
 /* ---------------- AUTH ---------------- */
 function toggleAuthForm(e){
@@ -728,19 +732,21 @@ function renderDashboard(){
 }
 
 function renderLeaderboard(){
-  const poin = {}; // nama -> jumlah tugas selesai
-  cache.tasks.forEach(t => {
-    if(t.status === 'selesai' && t.completedBy){
-      poin[t.completedBy] = (poin[t.completedBy]||0) + 1;
-    }
+  const poin = {}; // nama -> { jumlah, divisi }
+  cache.tasks.filter(t => t.status==='selesai' && t.dikerjakanOleh).forEach(t => {
+    if(!poin[t.dikerjakanOleh]) poin[t.dikerjakanOleh] = { jumlah:0, divisi:t.divisi };
+    poin[t.dikerjakanOleh].jumlah += 1;
   });
-  const ranked = Object.entries(poin).sort((a,b) => b[1]-a[1]);
-  const medal = ['🥇','🥈','🥉'];
-  document.getElementById('dashLeaderboard').innerHTML = ranked.length ? ranked.map(([nama,jumlah],i) => `
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);">
-      <span>${medal[i]||('#'+(i+1))} ${escapeHtml(nama)}</span>
-      <span class="font-mono" style="font-weight:600;">${jumlah} poin</span>
-    </div>`).join('') : '<p style="color:var(--ink-soft);">Belum ada tugas yang diselesaikan.</p>';
+  // pastikan semua anggota tampil walau poinnya 0, biar kelihatan siapa belum kerja sama sekali
+  cache.users.forEach(u => { if(!poin[u.nama]) poin[u.nama] = { jumlah:0, divisi:u.role }; });
+
+  const sorted = Object.entries(poin).sort((a,b) => b[1].jumlah - a[1].jumlah);
+  document.getElementById('dashLeaderboard').innerHTML = sorted.map(([nama, d], i) => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid var(--line);">
+      <span><span class="font-mono" style="color:var(--ink-soft); font-size:11px; width:20px; display:inline-block;">#${i+1}</span> ${escapeHtml(nama)}
+        <span class="font-mono" style="color:var(--ink-soft); font-size:11px;">· ${ROLE_LABELS[d.divisi]||d.divisi}</span></span>
+      <span class="stamp ${d.jumlah>0 ? 'stamp-selesai' : 'stamp-belum'}" style="font-size:9px; padding:2px 7px;">${d.jumlah} tugas</span>
+    </div>`).join('') || '<p style="color:var(--ink-soft);">Belum ada data.</p>';
 }
 
 function escapeHtml(s){
@@ -877,11 +883,8 @@ function renderTugas(){
       <p style="font-size:13px; color:var(--ink-soft); margin:8px 0;">${escapeHtml(t.deskripsi||'')}</p>
       <div class="font-mono" style="font-size:11px; color:var(--ink-soft); margin-bottom:10px;">
         ${ROLE_LABELS[t.divisi]||t.divisi} · PJ: ${escapeHtml(t.penanggungJawab||'-')} · Deadline: ${t.deadline ? fmtDate(t.deadline) : '-'}
+        ${t.status==='selesai' && t.dikerjakanOleh ? `<br>Dikerjakan oleh: <strong>${escapeHtml(t.dikerjakanOleh)}</strong>` : ''}
       </div>
-      ${t.status==='selesai' && t.completedBy ? `
-      <div class="font-mono" style="font-size:11px; color:var(--forest); margin-bottom:10px;">
-        ✓ Dikerjakan oleh: ${escapeHtml(t.completedBy)}
-      </div>` : ''}
       ${canManage(t.divisi) ? `
       <div style="display:flex; gap:6px; flex-wrap:wrap;">
         <select onchange="updateTugasStatus('${t.id}', this.value)" style="width:auto; font-size:11.5px; padding:5px 8px;">
@@ -933,15 +936,11 @@ function saveTugas(id){
 function updateTugasStatus(id, status){
   const data = { status };
   if(status === 'selesai'){
-    // Siapa pun yang menekan "Selesai" itulah yang dianggap mengerjakan —
-    // supaya poin kontribusi tercatat otomatis tanpa isi form terpisah.
-    data.completedBy = currentProfile.nama;
-    data.completedByUid = currentUser.uid;
-    data.completedAt = firebase.firestore.FieldValue.serverTimestamp();
+    data.dikerjakanOleh = currentProfile.nama;
+    data.selesaiPada = firebase.firestore.FieldValue.serverTimestamp();
   } else {
-    data.completedBy = firebase.firestore.FieldValue.delete();
-    data.completedByUid = firebase.firestore.FieldValue.delete();
-    data.completedAt = firebase.firestore.FieldValue.delete();
+    data.dikerjakanOleh = firebase.firestore.FieldValue.delete();
+    data.selesaiPada = firebase.firestore.FieldValue.delete();
   }
   db.collection('tasks').doc(id).update(data).then(()=> toast('Status tugas diperbarui.'));
 }
@@ -967,7 +966,7 @@ function renderKeuangan(){
       <td><span class="stamp ${f.tipe==='masuk'?'stamp-selesai':'stamp-belum'}" style="font-size:9px; padding:2px 6px;">${f.tipe==='masuk'?'Masuk':'Keluar'}</span></td>
       <td class="font-mono">${rupiah(f.jumlah)}</td>
       <td style="font-size:12px; color:var(--ink-soft);">${escapeHtml(f.createdBy||'-')}</td>
-      <td>${isBPH() ? `<button class="btn btn-danger btn-sm" onclick="deleteKeuangan('${f.id}')">Hapus</button>` : ''}</td>
+      <td>${canManageKeuangan() ? `<button class="btn btn-danger btn-sm" onclick="deleteKeuangan('${f.id}')">Hapus</button>` : ''}</td>
     </tr>`).join('') || `<tr><td colspan="6" style="color:var(--ink-soft);">Belum ada transaksi.</td></tr>`;
 }
 
