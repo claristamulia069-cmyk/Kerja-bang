@@ -448,6 +448,7 @@ td{
             <option value="bph">BPH</option>
             <option value="sekretaris">Sekretaris</option>
             <option value="bendahara">Bendahara</option>
+            <option value="logistik">Logistik</option>
             <option value="akademi">Akademi</option>
             <option value="humas">Humas</option>
             <option value="pdd">PDD</option>
@@ -543,7 +544,7 @@ const secondaryAuth = secondaryApp.auth();
    hapus form setup) supaya orang lain tidak bisa membuat akun Super baru. */
 const SUPER_SETUP_CODE = "KKN-SUPER-2026";
 
-const ROLE_LABELS = { super:'Super Admin', bph:'BPH (Ketua/Wakil)', sekretaris:'Sekretaris', bendahara:'Bendahara', akademi:'Sie Akademi', humas:'Sie Humas', pdd:'Sie PDD', acara:'Sie Acara' };
+const ROLE_LABELS = { super:'Super Admin', bph:'BPH (Ketua/Wakil)', sekretaris:'Sekretaris', bendahara:'Bendahara', logistik:'Sie Logistik', akademi:'Sie Akademi', humas:'Sie Humas', pdd:'Sie PDD', acara:'Sie Acara' };
 
 let currentUser = null;   // firebase auth user
 let currentProfile = null; // firestore users/{uid} doc
