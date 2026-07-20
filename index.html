@@ -423,6 +423,7 @@ td{
           <h1>Anggota &amp; Divisi</h1>
         </div>
         <button class="btn hidden" id="btnTambahAnggota" onclick="openTambahAnggotaModal()">+ Tambah Anggota</button>
+        <button class="btn btn-outline hidden" id="btnBulkAnggota" onclick="openBulkAnggotaModal()">⚡ Buat 17 Akun Sekaligus</button>
       </div>
       <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-4px;">
         Akun bersifat tetap — divisi hanya dapat diubah oleh Super Admin.
@@ -664,6 +665,7 @@ auth.onAuthStateChanged(user => {
       document.getElementById('sbUserName').textContent = currentProfile.nama;
       document.getElementById('sbUserRole').textContent = ROLE_LABELS[currentProfile.role] || currentProfile.role;
       document.getElementById('btnTambahAnggota').classList.toggle('hidden', !isSuper());
+      document.getElementById('btnBulkAnggota').classList.toggle('hidden', !isSuper());
       document.getElementById('todayDate').textContent = new Date().toLocaleDateString('id-ID',{ weekday:'long', day:'2-digit', month:'long', year:'numeric' });
       attachListeners();
     });
@@ -787,6 +789,81 @@ function saveAnggotaRole(uid){
   const role = document.getElementById('editRoleSelect').value;
   const jabatan = document.getElementById('editJabatanInput').value.trim();
   db.collection('users').doc(uid).update({ role, jabatan }).then(()=>{ toast('Divisi diperbarui.'); closeModal(); });
+}
+
+/* ---------------- SETUP MASSAL 17 AKUN ---------------- */
+/* Ganti nama & email di bawah ini dengan data asli 17 anggota kamu
+   sebelum diklik. Sandi awal sudah diacak per akun — dicatat di sini
+   supaya kamu tetap punya arsipnya setelah dibuat. Setelah akun jadi,
+   sebaiknya isi ulang array ini jadi kosong / hapus supaya tidak ada
+   yang bisa lihat daftar sandi awal ini dari source code. */
+const PRESET_ACCOUNTS = [
+  { nama:'Ketua',        email:'ketua@kknkelompok.id',       password:'TAF1ecNj', role:'bph',        jabatan:'Ketua' },
+  { nama:'Wakil Ketua',  email:'wakilketua@kknkelompok.id',  password:'6oXz7avb', role:'bph',        jabatan:'Wakil Ketua' },
+  { nama:'Sekretaris 1', email:'sekretaris1@kknkelompok.id', password:'uASp4YvA', role:'sekretaris', jabatan:'Anggota 1' },
+  { nama:'Sekretaris 2', email:'sekretaris2@kknkelompok.id', password:'koaDUCll', role:'sekretaris', jabatan:'Anggota 2' },
+  { nama:'Bendahara 1',  email:'bendahara1@kknkelompok.id',  password:'mpHMBciN', role:'bendahara',  jabatan:'Anggota 1' },
+  { nama:'Bendahara 2',  email:'bendahara2@kknkelompok.id',  password:'e4tWnINk', role:'bendahara',  jabatan:'Anggota 2' },
+  { nama:'Logistik 1',   email:'logistik1@kknkelompok.id',   password:'DmC0Pjmf', role:'logistik',   jabatan:'Anggota 1' },
+  { nama:'Logistik 2',   email:'logistik2@kknkelompok.id',   password:'zBiP5x6X', role:'logistik',   jabatan:'Anggota 2' },
+  { nama:'Logistik 3',   email:'logistik3@kknkelompok.id',   password:'kqHHqgLg', role:'logistik',   jabatan:'Anggota 3' },
+  { nama:'PDD 1',        email:'pdd1@kknkelompok.id',        password:'nPNpyNHb', role:'pdd',        jabatan:'Anggota 1' },
+  { nama:'PDD 2',        email:'pdd2@kknkelompok.id',        password:'xmECGWuQ', role:'pdd',        jabatan:'Anggota 2' },
+  { nama:'PDD 3',        email:'pdd3@kknkelompok.id',        password:'sVuk0o6G', role:'pdd',        jabatan:'Anggota 3' },
+  { nama:'Acara 1',      email:'acara1@kknkelompok.id',      password:'881IVxnr', role:'acara',      jabatan:'Anggota 1' },
+  { nama:'Acara 2',      email:'acara2@kknkelompok.id',      password:'hcI37Ucw', role:'acara',      jabatan:'Anggota 2' },
+  { nama:'Humas 1',      email:'humas1@kknkelompok.id',      password:'SSN2MQFh', role:'humas',      jabatan:'Anggota 1' },
+  { nama:'Humas 2',      email:'humas2@kknkelompok.id',      password:'qAwMdgIy', role:'humas',      jabatan:'Anggota 2' },
+  { nama:'Akademi',      email:'akademi@kknkelompok.id',     password:'3yjkyN2z', role:'akademi',    jabatan:'' }
+];
+
+function openBulkAnggotaModal(){
+  const rows = PRESET_ACCOUNTS.map(a => `
+    <tr>
+      <td>${escapeHtml(a.nama)}</td>
+      <td>${ROLE_LABELS[a.role]}</td>
+      <td class="font-mono" style="font-size:11px;">${escapeHtml(a.email)}</td>
+    </tr>`).join('');
+  showModal(`
+    <h3 style="margin-top:0;">Buat 17 Akun Sekaligus</h3>
+    <p style="font-size:12.5px; color:var(--ink-soft);">
+      Sebelum lanjut: kalau nama/email di daftar ini masih placeholder
+      (belum kamu edit di source code index.html jadi nama & email asli
+      anggota), akun tetap akan dibuat pakai data placeholder ini — bisa
+      diubah namanya belakangan lewat Super Admin, tapi email login-nya
+      akan tetap seperti di bawah.
+    </p>
+    <div style="max-height:260px; overflow-y:auto; border:1px solid var(--line); margin-bottom:14px;">
+      <table><thead><tr><th>Nama</th><th>Divisi</th><th>Email</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    <p id="bulkProgress" style="font-size:12.5px; color:var(--ink-soft);"></p>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal()">Batal</button>
+      <button class="btn" id="btnBulkGo" onclick="runBulkCreate()">Buat Semua Sekarang</button>
+    </div>`);
+}
+
+async function runBulkCreate(){
+  const btn = document.getElementById('btnBulkGo');
+  const progressEl = document.getElementById('bulkProgress');
+  btn.disabled = true;
+  let sukses = 0, gagal = [];
+  for(let i=0; i<PRESET_ACCOUNTS.length; i++){
+    const a = PRESET_ACCOUNTS[i];
+    progressEl.textContent = `Membuat akun ${i+1}/${PRESET_ACCOUNTS.length} — ${a.nama}...`;
+    try{
+      await tambahAnggota(a.nama, a.email, a.password, a.role, a.jabatan);
+      sukses++;
+    } catch(err){
+      gagal.push(`${a.nama} (${a.email}): ${translateAuthError(err)}`);
+    }
+  }
+  progressEl.innerHTML = `Selesai: <strong>${sukses}</strong> akun berhasil dibuat.` +
+    (gagal.length ? `<br><span style="color:var(--brick);">${gagal.length} gagal:<br>${gagal.map(escapeHtml).join('<br>')}</span>` : '');
+  btn.textContent = 'Tutup';
+  btn.disabled = false;
+  btn.onclick = closeModal;
+  toast(`${sukses} akun berhasil dibuat.`);
 }
 
 function openTambahAnggotaModal(){
